@@ -1,0 +1,208 @@
+import { Request, Response } from 'express';
+import * as coordinatorService from './coordinator.service';
+import { sendError, sendSuccess } from '../../utils/response';
+import logger from '../../utils/logger';
+
+export const getStats = async (req: Request, res: Response) => {
+    try {
+        const data = await coordinatorService.getCoordinatorStats(req.user!.id);
+        sendSuccess(res, data);
+    } catch (error: any) {
+        logger.error('coordinator.getStats error:', error.message);
+        sendError(res, error.message || 'Could not fetch stats', 500);
+    }
+};
+
+export const getFaculty = async (_req: Request, res: Response) => {
+    try {
+        const data = await coordinatorService.getFaculty();
+        sendSuccess(res, data);
+    } catch (error: any) {
+        logger.error('coordinator.getFaculty error:', error.message);
+        sendError(res, error.message || 'Could not fetch faculty', 500);
+    }
+};
+
+export const createFaculty = async (req: Request, res: Response) => {
+    try {
+        const data = await coordinatorService.createFaculty(req.body);
+        sendSuccess(res, data, 'Faculty created', 201);
+    } catch (error: any) {
+        logger.error('coordinator.createFaculty error:', error.message);
+        sendError(res, error.message || 'Could not create faculty', 500);
+    }
+};
+
+export const updateFaculty = async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(req.params.id as string);
+        if (isNaN(id)) return sendError(res, 'Invalid faculty id', 400);
+        const data = await coordinatorService.updateFaculty(id, req.body);
+        sendSuccess(res, data, 'Faculty updated');
+    } catch (error: any) {
+        logger.error('coordinator.updateFaculty error:', error.message);
+        sendError(res, error.message || 'Could not update faculty', 500);
+    }
+};
+
+export const getBatches = async (req: Request, res: Response) => {
+    try {
+        const data = await coordinatorService.getBatches(req.user!.id);
+        sendSuccess(res, data);
+    } catch (error: any) {
+        logger.error('coordinator.getBatches error:', error.message);
+        sendError(res, error.message || 'Could not fetch batches', 500);
+    }
+};
+
+export const createBatch = async (req: Request, res: Response) => {
+    try {
+        const data = await coordinatorService.createBatch(req.user!.id, req.body);
+        sendSuccess(res, data, 'Batch created', 201);
+    } catch (error: any) {
+        logger.error('coordinator.createBatch error:', error.message);
+        sendError(res, error.message || 'Could not create batch', 500);
+    }
+};
+
+export const getStudents = async (req: Request, res: Response) => {
+    try {
+        const batchId = req.query.batchId ? parseInt(req.query.batchId as string) : undefined;
+        const data = await coordinatorService.getStudents(req.user!.id, batchId);
+        sendSuccess(res, data);
+    } catch (error: any) {
+        logger.error('coordinator.getStudents error:', error.message);
+        sendError(res, error.message || 'Could not fetch students', 500);
+    }
+};
+
+export const createStudent = async (req: Request, res: Response) => {
+    try {
+        const data = await coordinatorService.createStudent(req.body);
+        sendSuccess(res, data, 'Student created', 201);
+    } catch (error: any) {
+        logger.error('coordinator.createStudent error:', error.message);
+        sendError(res, error.message || 'Could not create student', 500);
+    }
+};
+
+export const importStudents = async (req: Request, res: Response) => {
+    try {
+        const students = Array.isArray(req.body?.students) ? req.body.students : req.body;
+        const data = await coordinatorService.importStudents(students);
+        sendSuccess(res, data, 'Students imported', 201);
+    } catch (error: any) {
+        logger.error('coordinator.importStudents error:', error.message);
+        sendError(res, error.message || 'Could not import students', 500);
+    }
+};
+
+export const getGuideAllocations = async (req: Request, res: Response) => {
+    try {
+        const batchId = parseInt(req.params.batchId as string);
+        if (isNaN(batchId)) return sendError(res, 'Invalid batch id', 400);
+        const data = await coordinatorService.getGuideAllocations(batchId);
+        sendSuccess(res, data);
+    } catch (error: any) {
+        logger.error('coordinator.getGuideAllocations error:', error.message);
+        sendError(res, error.message || 'Could not fetch guide allocations', 500);
+    }
+};
+
+export const assignGuide = async (req: Request, res: Response) => {
+    try {
+        const { groupId, guideId } = req.body;
+        const data = await coordinatorService.assignGuide(parseInt(groupId), parseInt(guideId));
+        sendSuccess(res, data, 'Guide assigned');
+    } catch (error: any) {
+        logger.error('coordinator.assignGuide error:', error.message);
+        sendError(res, error.message || 'Could not assign guide', 500);
+    }
+};
+
+export const getProjects = async (req: Request, res: Response) => {
+    try {
+        const batchId = req.query.batchId ? parseInt(req.query.batchId as string) : undefined;
+        const data = await coordinatorService.getProjectGroups(req.user!.id, batchId);
+        sendSuccess(res, data);
+    } catch (error: any) {
+        logger.error('coordinator.getProjects error:', error.message);
+        sendError(res, error.message || 'Could not fetch projects', 500);
+    }
+};
+
+export const getDeadlines = async (req: Request, res: Response) => {
+    try {
+        const batchId = parseInt(req.params.batchId as string);
+        if (isNaN(batchId)) return sendError(res, 'Invalid batch id', 400);
+        const data = await coordinatorService.getDeadlines(batchId);
+        sendSuccess(res, data);
+    } catch (error: any) {
+        logger.error('coordinator.getDeadlines error:', error.message);
+        sendError(res, error.message || 'Could not fetch deadlines', 500);
+    }
+};
+
+export const createDeadline = async (req: Request, res: Response) => {
+    try {
+        const data = await coordinatorService.createDeadline(req.user!.id, req.body);
+        sendSuccess(res, data, 'Deadline created', 201);
+    } catch (error: any) {
+        logger.error('coordinator.createDeadline error:', error.message);
+        sendError(res, error.message || 'Could not create deadline', 500);
+    }
+};
+
+export const updateDeadline = async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(req.params.id as string);
+        if (isNaN(id)) return sendError(res, 'Invalid deadline id', 400);
+        const data = await coordinatorService.updateDeadline(id, req.body);
+        sendSuccess(res, data, 'Deadline updated');
+    } catch (error: any) {
+        logger.error('coordinator.updateDeadline error:', error.message);
+        sendError(res, error.message || 'Could not update deadline', 500);
+    }
+};
+
+export const deleteDeadline = async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(req.params.id as string);
+        if (isNaN(id)) return sendError(res, 'Invalid deadline id', 400);
+        const data = await coordinatorService.deleteDeadline(id);
+        sendSuccess(res, data, 'Deadline deleted');
+    } catch (error: any) {
+        logger.error('coordinator.deleteDeadline error:', error.message);
+        sendError(res, error.message || 'Could not delete deadline', 500);
+    }
+};
+
+export const getSubmissionAudit = async (req: Request, res: Response) => {
+    try {
+        const data = await coordinatorService.getSubmissionAudit(req.user!.id);
+        sendSuccess(res, data);
+    } catch (error: any) {
+        logger.error('coordinator.getSubmissionAudit error:', error.message);
+        sendError(res, error.message || 'Could not fetch submission audit', 500);
+    }
+};
+
+export const getTopicAudit = async (req: Request, res: Response) => {
+    try {
+        const data = await coordinatorService.getTopicAudit(req.user!.id);
+        sendSuccess(res, data);
+    } catch (error: any) {
+        logger.error('coordinator.getTopicAudit error:', error.message);
+        sendError(res, error.message || 'Could not fetch topic audit', 500);
+    }
+};
+
+export const getProjectHealth = async (req: Request, res: Response) => {
+    try {
+        const data = await coordinatorService.getProjectHealth(req.user!.id);
+        sendSuccess(res, data);
+    } catch (error: any) {
+        logger.error('coordinator.getProjectHealth error:', error.message);
+        sendError(res, error.message || 'Could not fetch project health', 500);
+    }
+};

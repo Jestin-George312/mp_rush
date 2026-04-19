@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Optional base styles */
+@layer base {
+  html, body, #root { height: 100%; }
+  /* Use CSS variables set by ThemeProvider for global colors */
+  :root {
+    color-scheme: light;
+  }
+  body {
+    background-color: rgb(var(--color-bg));
+    color: rgb(var(--color-text));
+    transition: background-color .25s ease, color .25s ease;
+  }
+}
