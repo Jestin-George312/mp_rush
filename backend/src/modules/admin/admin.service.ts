@@ -13,7 +13,7 @@ export const getAllDepartments = async () => {
 
 export const createDepartment = async (name: string) => {
     const result = await pool.query(
-        'INSERT INTO departments (name) VALUES ($1) RETURNING *',
+        'INSERT INTO departments (name, coordinator_id) VALUES ($1, NULL) RETURNING *',
         [name]
     );
     return result.rows[0];
@@ -33,7 +33,7 @@ export const createCoordinator = async (data: { name: string; email: string; pas
         // 1. Create User
         const userResult = await client.query(
             `INSERT INTO users (email, password_hash, auth_provider, role) 
-             VALUES ($1, $2, 'local', 'Coordinator') 
+             VALUES ($1, $2, 'local', 'coordinator') 
              RETURNING uid, email, role`,
             [data.email, data.password_hash]
         );
@@ -61,7 +61,7 @@ export const listCoordinators = async () => {
         SELECT u.uid, u.email, u.role, p.full_name as name
         FROM users u
         LEFT JOIN profiles p ON u.uid = p.u_id
-        WHERE LOWER(u.role) = 'coordinator' AND u.is_deleted = FALSE
+        WHERE LOWER(u.role::TEXT) = 'coordinator' AND u.is_deleted = FALSE
     `;
     const result = await pool.query(query);
     return result.rows;
@@ -69,7 +69,7 @@ export const listCoordinators = async () => {
 
 // --- Department Assignment ---
 
-export const assignCoordinatorToDepartment = async (departmentId: number, coordinatorId: number) => {
+export const assignCoordinatorToDepartment = async (departmentId: number, coordinatorId: number | null) => {
     const result = await pool.query(
         `UPDATE departments SET coordinator_id = $1 WHERE id = $2 RETURNING *`,
         [coordinatorId, departmentId]

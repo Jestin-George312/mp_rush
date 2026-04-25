@@ -8,7 +8,7 @@ import Select from '../../components/common/UI/Select';
 import { 
     Plus, Trash2, Building2, LayoutDashboard, 
     UserPlus, Users, Briefcase, CheckCircle2, 
-    AlertCircle, Link as LinkIcon 
+    AlertCircle, Link as LinkIcon, UserMinus
 } from 'lucide-react';
 import * as adminApi from '../../services/adminApi';
 import { toast } from 'react-hot-toast';
@@ -31,17 +31,11 @@ const AdminDashboard: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'departments' | 'coordinators' | 'assignments'>('departments');
     
     // Departments state
-    const [departments, setDepartments] = useState<Department[]>([
-        { id: 1, name: 'Computer Science', coordinator_id: 101, coordinator_name: 'Dr. Sarah Johnson', created_at: '2024-01-01' },
-        { id: 2, name: 'Information Technology', coordinator_id: null, coordinator_name: null, created_at: '2024-01-01' },
-    ]);
+    const [departments, setDepartments] = useState<Department[]>([]);
     const [newDeptName, setNewDeptName] = useState('');
     
     // Coordinators state
-    const [coordinators, setCoordinators] = useState<Coordinator[]>([
-        { uid: 101, name: 'Dr. Sarah Johnson', email: 'sarah@univ.edu' },
-        { uid: 102, name: 'Prof. Michael Chen', email: 'michael@univ.edu' },
-    ]);
+    const [coordinators, setCoordinators] = useState<Coordinator[]>([]);
     const [newCoord, setNewCoord] = useState({ name: '', email: '', password: '' });
     
     // Assignments state
@@ -126,6 +120,17 @@ const AdminDashboard: React.FC = () => {
             loadData();
         } catch (error) {
             toast.error('Assignment failed');
+        }
+    };
+
+    const handleUnassignCoord = async (departmentId: number) => {
+        if (!window.confirm('Unassign the coordinator from this department?')) return;
+        try {
+            await adminApi.assignCoordinatorToDepartment(departmentId, null as any);
+            toast.success('Coordinator unassigned');
+            loadData();
+        } catch (error) {
+            toast.error('Unassignment failed');
         }
     };
 
@@ -226,7 +231,7 @@ const AdminDashboard: React.FC = () => {
             </Card>
             <Card className="lg:col-span-2">
                 <Table 
-                    headers={['Department Name', 'Assigned Coordinator', 'Status']}
+                    headers={['Department Name', 'Assigned Coordinator', 'Status', 'Actions']}
                     rows={departments.map(d => [
                         <div className="font-bold">{d.name}</div>,
                         d.coordinator_name ? (
@@ -242,7 +247,18 @@ const AdminDashboard: React.FC = () => {
                             <Badge variant="success">Active</Badge>
                         ) : (
                             <Badge variant="warning">Pending</Badge>
-                        )
+                        ),
+                        <div className="flex gap-2">
+                             <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="text-red-500 border-red-200 hover:bg-red-50"
+                                disabled={!d.coordinator_id}
+                                onClick={() => handleUnassignCoord(d.id)}
+                            >
+                                <UserMinus size={14} className="mr-1" /> Unassign
+                            </Button>
+                        </div>
                     ])}
                 />
             </Card>

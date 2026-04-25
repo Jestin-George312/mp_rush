@@ -7,51 +7,66 @@ import Input from '../../components/common/UI/Input';
 import { 
     Search, CheckCircle, XCircle, Clock, 
     Database, BookOpen, User,
-    FileSearch, AlertCircle
+    FileSearch, AlertCircle, Loader2
 } from 'lucide-react';
+import * as coordApi from '../../services/coordinatorApi';
+import { toast } from 'react-hot-toast';
 
 const TopicMonitor: React.FC = () => {
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
 
-    // High fidelity mock data for topic auditing
-    const topics = [
-        { id: 't1', title: 'Decentralized Identity using Polygon', domain: 'Blockchain', group: 'MetaTrust', guide: 'Dr. Sarah Johnson', status: 'Approved', comments: 'Promising scope.' },
-        { id: 't2', title: 'Real-time Emotion Analysis', domain: 'Deep Learning', group: 'FeelAI', guide: 'Prof. Michael Chen', status: 'Pending', comments: 'Review in progress.' },
-        { id: 't3', title: 'Local Service Marketplace', domain: 'Web Tech', group: 'Servicely', guide: 'Alex Rivera', status: 'Rejected', comments: 'Scope too generic.' },
-        { id: 't4', title: 'Network Traffic Optimizer', domain: 'Networking', group: 'FlowMax', guide: 'Dr. Emily Williams', status: 'Approved', comments: 'Verified feasibility.' },
-    ];
+    const [topics, setTopics] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    React.useEffect(() => {
+        const fetchAudit = async () => {
+            try {
+                setIsLoading(true);
+                const res = await coordApi.getTopicAudit();
+                if (res.data?.success) {
+                    setTopics(res.data.data);
+                }
+            } catch (error) {
+                toast.error('Failed to load topic audits');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchAudit();
+    }, []);
 
     const filteredTopics = topics.filter(t => {
-        const matchSearch = t.title.toLowerCase().includes(search.toLowerCase()) || 
-                           t.group.toLowerCase().includes(search.toLowerCase());
-        const matchStatus = statusFilter === 'All' || t.status === statusFilter;
+        const matchSearch = (t.title || '').toLowerCase().includes(search.toLowerCase()) || 
+                           (t.group_name || '').toLowerCase().includes(search.toLowerCase());
+        const tStatus = t.review_state || 'Pending';
+        const matchStatus = statusFilter === 'All' || tStatus.toLowerCase() === statusFilter.toLowerCase();
         return matchSearch && matchStatus;
     });
 
     const headers = ['Topic Concept & Domain', 'Entities', 'Guide Input', 'Approval Audit', 'Insight'];
     const rows = filteredTopics.map(t => [
         <div className="flex flex-col gap-0.5">
-            <span className="font-bold text-sm tracking-tight leading-tight">{t.title}</span>
+            <span className="font-bold text-sm tracking-tight leading-tight">{t.title || 'Untitled Project'}</span>
             <div className="flex items-center gap-2 mt-1">
-                 <Badge variant="default" className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 text-[9px] px-1.5 py-0.5 font-black uppercase tracking-widest">{t.domain}</Badge>
+                 <Badge variant="default" className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 text-[9px] px-1.5 py-0.5 font-black uppercase tracking-widest">Project</Badge>
             </div>
         </div>,
         <div className="flex flex-col">
             <div className="flex items-center gap-1 text-[11px] font-bold text-[rgb(var(--color-primary))]">
-                <BookOpen size={12} className="text-gray-400" /> {t.group}
+                <BookOpen size={12} className="text-gray-400" /> {t.group_name}
             </div>
             <div className="flex items-center gap-1 text-[10px] text-[rgb(var(--color-muted))] mt-0.5">
-                <User size={10} className="text-gray-400" /> {t.guide}
+                <User size={10} className="text-gray-400" /> {t.batch_name}
             </div>
         </div>,
         <div className="max-w-[150px]">
-             <p className="text-[10px] text-gray-500 italic leading-snug line-clamp-2">"{t.comments}"</p>
+             <p className="text-[10px] text-gray-500 italic leading-snug line-clamp-2">"{t.topic_feedback || 'No comments'}"</p>
         </div>,
         <div className="flex items-center gap-2">
-            {t.status === 'Approved' && <Badge variant="success" className="text-[9px] tracking-tight"><CheckCircle size={10} className="mr-1" /> VERIFIED</Badge>}
-            {t.status === 'Pending' && <Badge variant="warning" className="text-[9px] tracking-tight"><Clock size={10} className="mr-1" /> AUDITING</Badge>}
-            {t.status === 'Rejected' && <Badge variant="danger" className="text-[9px] tracking-tight"><XCircle size={10} className="mr-1" /> DECLINED</Badge>}
+            {t.review_state === 'Approved' && <Badge variant="success" className="text-[9px] tracking-tight"><CheckCircle size={10} className="mr-1" /> VERIFIED</Badge>}
+            {(t.review_state === 'Pending' || !t.review_state) && <Badge variant="warning" className="text-[9px] tracking-tight"><Clock size={10} className="mr-1" /> AUDITING</Badge>}
+            {t.review_state === 'Rejected' && <Badge variant="danger" className="text-[9px] tracking-tight"><XCircle size={10} className="mr-1" /> DECLINED</Badge>}
         </div>,
         <button className="text-[10px] font-black uppercase text-blue-600 hover:underline">Full Trace</button>
     ]);
@@ -81,7 +96,7 @@ const TopicMonitor: React.FC = () => {
                      </div>
                      <div>
                          <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-1">In Validation</p>
-                         <h3 className="text-2xl font-black">01</h3>
+                         <h3 className="text-2xl font-black">{topics.filter(t => !t.review_state || t.review_state === 'Pending').length}</h3>
                      </div>
                 </Card>
                 <Card className="flex items-center gap-5 border-l-4 border-l-red-500 bg-red-50/20">
@@ -90,7 +105,7 @@ const TopicMonitor: React.FC = () => {
                      </div>
                      <div>
                          <p className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1">Declined Topics</p>
-                         <h3 className="text-2xl font-black">01</h3>
+                         <h3 className="text-2xl font-black">{topics.filter(t => t.review_state === 'Rejected').length}</h3>
                      </div>
                 </Card>
             </div>
@@ -114,14 +129,29 @@ const TopicMonitor: React.FC = () => {
                             className="w-40 h-10 border-gray-200"
                         >
                             <option value="All">All States</option>
-                            <option>Approved</option>
-                            <option>Pending</option>
-                            <option>Rejected</option>
+                            <option value="approved">Approved</option>
+                            <option value="pending">Pending</option>
+                            <option value="rejected">Rejected</option>
                         </Select>
                     </div>
                 </div>
 
-                <Table headers={headers} rows={rows} />
+                {isLoading ? (
+                    <div className="flex justify-center p-8">
+                        <Loader2 className="animate-spin text-blue-500" />
+                    </div>
+                ) : filteredTopics.length > 0 ? (
+                    <Table headers={headers} rows={rows} />
+                ) : (
+                    <div className="py-20 text-center">
+                        <Database size={48} className="mx-auto text-gray-200 dark:text-gray-700 mb-4" />
+                        <h3 className="text-lg font-bold text-[rgb(var(--color-primary))]">No Topic Audits Found</h3>
+                        <p className="text-sm text-[rgb(var(--color-muted))] max-w-xs mx-auto mt-2">
+                            No research concepts found for the current selection.
+                        </p>
+                        <button onClick={() => {setSearch(''); setStatusFilter('All');}} className="mt-4 text-xs font-black uppercase tracking-widest text-blue-600 hover:underline">Reset Search</button>
+                    </div>
+                )}
             </Card>
         </div>
     );

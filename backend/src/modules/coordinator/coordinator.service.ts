@@ -21,7 +21,7 @@ export const getCoordinatorStats = async (coordinatorId: number) => {
              ${batchFilter.replace('WHERE b.department_id = $1', departmentId ? 'WHERE b.department_id = $1' : '')}`,
             params
         ),
-        pool.query(`SELECT COUNT(*)::int AS count FROM users WHERE LOWER(role) = 'guide' AND is_deleted = FALSE`),
+        pool.query(`SELECT COUNT(*)::int AS count FROM users WHERE LOWER(role::TEXT) = 'guide' AND is_deleted = FALSE`),
         pool.query(
             `SELECT COUNT(*)::int AS count
              FROM projects p
@@ -66,15 +66,49 @@ export const getCoordinatorStats = async (coordinatorId: number) => {
     const avgLoad = Number(guideLoadRes.rows[0]?.avg_load || 0);
     const guideAvailability = avgLoad >= 8 ? 'Low' : avgLoad >= 5 ? 'Medium' : 'High';
 
+    // Fetch the detailed lists for the dashboard
+    const [deadlinesList, facultyList] = await Promise.all([
+        pool.query(
+            `SELECT dl.id, dl.title, b.name AS batch, 
+                    dl.due_date::date - CURRENT_DATE AS days_left, 
+                    dl.phase AS type
+             FROM deadlines dl
+             JOIN batches b ON b.id = dl.batch_id
+             ${departmentId ? 'WHERE b.department_id = $1 AND dl.due_date >= CURRENT_DATE' : 'WHERE dl.due_date >= CURRENT_DATE'}
+             ORDER BY dl.due_date ASC LIMIT 5`,
+            params
+        ),
+        pool.query(
+            `SELECT u.uid AS id, p.full_name AS name, COUNT(g.id)::int AS load
+             FROM users u
+             LEFT JOIN profiles p ON p.u_id = u.uid
+             LEFT JOIN groups g ON g.guide_id = u.uid
+             WHERE LOWER(u.role::TEXT) = 'guide' AND u.is_deleted = FALSE
+             GROUP BY u.uid, p.full_name
+             ORDER BY load DESC LIMIT 5`
+        )
+    ]);
+
     return {
-        batches: batchesRes.rows[0]?.count || 0,
-        students: studentsRes.rows[0]?.count || 0,
-        faculty: facultyRes.rows[0]?.count || 0,
-        activeProjects: projectsRes.rows[0]?.count || 0,
-        pendingTopics: topicsRes.rows[0]?.count || 0,
-        upcomingDeadlines: deadlinesRes.rows[0]?.count || 0,
-        overdueSubmissions: overdueRes.rows[0]?.count || 0,
-        guideAvailability,
+        stats: {
+            batches: batchesRes.rows[0]?.count || 0,
+            students: studentsRes.rows[0]?.count || 0,
+            faculty: facultyRes.rows[0]?.count || 0,
+            activeProjects: projectsRes.rows[0]?.count || 0,
+            pendingTopics: topicsRes.rows[0]?.count || 0,
+            upcomingDeadlines: deadlinesRes.rows[0]?.count || 0,
+            overdueSubmissions: overdueRes.rows[0]?.count || 0,
+            guideAvailability,
+        },
+        deadlines: deadlinesList.rows.map(dl => ({
+            ...dl,
+            date: dl.days_left === 0 ? 'Today' : dl.days_left === 1 ? 'Tomorrow' : `${dl.days_left} days left`
+        })),
+        faculty: facultyList.rows.map(f => ({
+            ...f,
+             status: f.load >= 8 ? 'Full' : f.load >= 5 ? 'Normal' : 'Available',
+             load: `${f.load}/10`
+        }))
     };
 };
 
@@ -90,7 +124,7 @@ export const getFaculty = async () => {
          FROM users u
          LEFT JOIN profiles p ON p.u_id = u.uid
          LEFT JOIN groups g ON g.guide_id = u.uid
-         WHERE LOWER(u.role) = 'guide' AND u.is_deleted = FALSE
+         WHERE LOWER(u.role::TEXT) = 'guide' AND u.is_deleted = FALSE
          GROUP BY u.uid, p.full_name, u.email, p.bio
          ORDER BY p.full_name`
     );
@@ -176,7 +210,7 @@ export const getStudents = async (coordinatorId: number, batchId?: number) => {
         conditions.push(`b.id = $${params.length}`);
     }
 
-    conditions.push(`LOWER(u.role) = 'student'`);
+    conditions.push(`LOWER(u.role::TEXT) = 'student'`);
     const where = `WHERE ${conditions.join(' AND ')}`;
     const result = await pool.query(
         `SELECT
@@ -400,6 +434,7 @@ export const getProjectHealth = async (coordinatorId: number) => {
         `SELECT
             p.id,
             p.title,
+            p.github_repo,
             g.group_name AS "groupName",
             MAX(CASE WHEN t.deadline < CURRENT_DATE AND t.status != 'done' THEN CURRENT_DATE - t.deadline ELSE 0 END)::int AS "daysOverdue"
          FROM projects p
@@ -407,7 +442,7 @@ export const getProjectHealth = async (coordinatorId: number) => {
          LEFT JOIN batches b ON b.id = g.batch_id
          LEFT JOIN tasks t ON t.project_id = p.id
          ${departmentId ? 'WHERE b.department_id = $1' : ''}
-         GROUP BY p.id, p.title, g.group_name
+         GROUP BY p.id, p.title, p.github_repo, g.group_name
          ORDER BY "daysOverdue" DESC`,
         departmentId ? [departmentId] : []
     );
@@ -416,6 +451,7 @@ export const getProjectHealth = async (coordinatorId: number) => {
             ...row,
             id: String(row.id),
             daysOverdue: Number(row.daysOverdue),
+            hasRepo: !!row.github_repo
         })),
     };
 };

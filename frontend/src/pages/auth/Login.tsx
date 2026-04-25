@@ -59,7 +59,7 @@ const Login: React.FC = () => {
       <div className="flex-1 flex items-center justify-center px-4">
         <div className="w-full max-w-[420px] bg-[rgb(var(--color-card))] border border-[rgb(var(--color-border))] rounded-2xl p-8 sm:p-10 shadow-2xl">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold mb-3">Welcome Back</h1>
+            <h1 className="text-3xl font-bold mb-3">Sign In</h1>
             <p className="text-[rgb(var(--color-muted))] text-sm">Sign in to the Academic Project Monitoring System</p>
           </div>
 

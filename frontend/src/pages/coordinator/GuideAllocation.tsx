@@ -7,8 +7,10 @@ import Modal from '../../components/common/UI/Modal';
 import Select from '../../components/common/UI/Select';
 import { 
     Users, Star, Search, Briefcase, 
-    Database, Layers
+    Database, Layers, Loader2
 } from 'lucide-react';
+import * as coordApi from '../../services/coordinatorApi';
+import { toast } from 'react-hot-toast';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Member {
@@ -35,64 +37,13 @@ interface Batch {
     batchName: string;
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-const BATCHES: Batch[] = [
-    { id: 'b1', batchName: 'MCA 2024-26 Batch A' },
-    { id: 'b2', batchName: 'MCA 2024-26 Batch B' },
-    { id: 'b3', batchName: 'MCA 2023-25 Batch A' },
-];
-
-const GUIDES = [
-    { id: 'g1', name: 'Dr. Sarah Johnson', specialization: 'AI/ML' },
-    { id: 'g2', name: 'Prof. Michael Chen', specialization: 'Web Tech' },
-    { id: 'g3', name: 'Dr. Emily Williams', specialization: 'Data Science' },
-];
-
-const INITIAL_GROUPS: ProjectGroup[] = [
-    { 
-        id: '1', 
-        groupName: 'Team Alpha', 
-        projectTitle: 'E-Commerce Platform', 
-        domain: 'Web Development', 
-        type: 'Group',
-        batchId: 'b1',
-        members: [
-            { id: 's1', name: 'John Doe', email: 'john@edu.com', isLeader: true },
-            { id: 's2', name: 'Jane Smith', email: 'jane@edu.com', isLeader: false }
-        ],
-        guideId: 'g1', 
-        guideName: 'Dr. Sarah Johnson' 
-    },
-    { 
-        id: '2', 
-        groupName: 'Individual-P1', 
-        projectTitle: 'Portfolio Site', 
-        domain: 'Web Development', 
-        type: 'Individual',
-        batchId: 'b1',
-        members: [{ id: 's3', name: 'Alex Lee', email: 'alex@edu.com', isLeader: true }],
-        guideId: null, 
-        guideName: null 
-    },
-    { 
-        id: '3', 
-        groupName: 'CyberGuard', 
-        projectTitle: 'Firewall Script', 
-        domain: 'Security', 
-        type: 'Group',
-        batchId: 'b2',
-        members: [
-            { id: 's4', name: 'Mike Ross', email: 'mike@edu.com', isLeader: true },
-            { id: 's5', name: 'Harvey Specter', email: 'harvey@edu.com', isLeader: false }
-        ],
-        guideId: null, 
-        guideName: null 
-    },
-];
-
 const GuideAllocation: React.FC = () => {
-    const [selectedBatchId, setSelectedBatchId] = useState<string>(BATCHES[0].id);
-    const [groups, setGroups] = useState<ProjectGroup[]>(INITIAL_GROUPS);
+    const [selectedBatchId, setSelectedBatchId] = useState<string>('');
+    const [batches, setBatches] = useState<any[]>([]);
+    const [groups, setGroups] = useState<any[]>([]);
+    const [guides, setGuides] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
     const [search, setSearch] = useState('');
     const [filterType, setFilterType] = useState<'All' | 'Individual' | 'Group'>('All');
     
@@ -101,57 +52,92 @@ const GuideAllocation: React.FC = () => {
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
     const [selectedGuideId, setSelectedGuideId] = useState('');
 
+    useEffect(() => {
+        const fetchInitial = async () => {
+            try {
+                const bRes = await coordApi.getBatches();
+                if (bRes.data?.success && bRes.data.data.length > 0) {
+                    setBatches(bRes.data.data);
+                    setSelectedBatchId(bRes.data.data[0].id.toString());
+                } else {
+                    setIsLoading(false);
+                }
+            } catch (err) {
+                toast.error('Failed to load batches');
+                setIsLoading(false);
+            }
+        };
+        fetchInitial();
+    }, []);
+
+    useEffect(() => {
+        if (!selectedBatchId) return;
+        const fetchAllocations = async () => {
+            try {
+                setIsLoading(true);
+                const res = await coordApi.getGuideAllocations(selectedBatchId);
+                if (res.data?.success) {
+                    setGuides(res.data.data.guides);
+                    setGroups(res.data.data.groups);
+                }
+            } catch (err) {
+                toast.error('Failed to load allocations');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchAllocations();
+    }, [selectedBatchId]);
+
     // Derived
     const filteredGroups = useMemo(() => {
         return groups.filter(g => {
-            const matchBatch = g.batchId === selectedBatchId;
-            const matchSearch = g.groupName.toLowerCase().includes(search.toLowerCase()) || 
-                               g.projectTitle.toLowerCase().includes(search.toLowerCase());
-            const matchType = filterType === 'All' || g.type === filterType;
-            return matchBatch && matchSearch && matchType;
+            const groupName = g.group_name || '';
+            const projectTitle = g.project_title || '';
+            const matchSearch = groupName.toLowerCase().includes(search.toLowerCase()) || 
+                               projectTitle.toLowerCase().includes(search.toLowerCase());
+            const matchType = filterType === 'All'; // Simplified filter
+            return matchSearch && matchType;
         });
-    }, [groups, selectedBatchId, search, filterType]);
+    }, [groups, search, filterType]);
 
-    const handleAssign = (group: ProjectGroup) => {
-        setSelectedGroupId(group.id);
-        setSelectedGuideId(group.guideId || '');
+    const handleAssign = (group: any) => {
+        setSelectedGroupId(group.id.toString());
+        setSelectedGuideId(group.guide_id ? group.guide_id.toString() : '');
         setIsModalOpen(true);
     };
 
-    const confirmAllocation = () => {
+    const confirmAllocation = async () => {
         if (!selectedGroupId || !selectedGuideId) return;
-        const guide = GUIDES.find(g => g.id === selectedGuideId);
-        if (!guide) return;
-        setGroups(prev => prev.map(g => g.id === selectedGroupId ? { ...g, guideId: guide.id, guideName: guide.name } : g));
-        setIsModalOpen(false);
+        try {
+            await coordApi.assignGuide({ groupId: selectedGroupId, guideId: selectedGuideId });
+            toast.success('Guide assigned successfully');
+            setGroups(prev => prev.map(g => g.id.toString() === selectedGroupId ? { ...g, guide_id: selectedGuideId, guide_name: guides.find(gd => gd.id.toString() === selectedGuideId)?.name } : g));
+            setIsModalOpen(false);
+        } catch (error) {
+            toast.error('Failed to assign guide');
+        }
     };
 
     // Table Data
     const headers = ['Group Name', 'Members', 'Status', 'Guide', 'Action'];
     const rows = filteredGroups.map(group => [
         <div className="flex flex-col gap-0.5">
-            <span className="font-bold text-sm">{group.groupName}</span>
-            <span className="text-[10px] text-[rgb(var(--color-muted))] line-clamp-1">{group.projectTitle}</span>
-            <div className="mt-1"><Badge variant={group.type === 'Group' ? 'info' : 'secondary'}>{group.type}</Badge></div>
+            <span className="font-bold text-sm">{group.group_name}</span>
+            <span className="text-[10px] text-[rgb(var(--color-muted))] line-clamp-1">{group.project_title || 'No Title Yet'}</span>
+            <div className="mt-1"><Badge variant="info">Group</Badge></div>
         </div>,
         <div className="flex -space-x-1.5 overflow-hidden">
-            {group.members.map(m => (
-                <div 
-                    key={m.id} 
-                    title={m.name + (m.isLeader ? ' (Leader)' : '')}
-                    className={`w-7 h-7 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center text-[10px] font-bold text-white shadow-sm
-                        ${m.isLeader ? 'bg-amber-500' : 'bg-blue-500'}`}
-                >
-                    {m.name.charAt(0)}
-                </div>
-            ))}
+            <div className={`w-7 h-7 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center text-[10px] font-bold text-white shadow-sm bg-blue-500`}>
+                G
+            </div>
         </div>,
-        <Badge variant={group.guideId ? 'success' : 'warning'}>
-            {group.guideId ? 'Allocated' : 'Pending'}
+        <Badge variant={group.guide_id ? 'success' : 'warning'}>
+            {group.guide_id ? 'Allocated' : 'Pending'}
         </Badge>,
-        <span className="text-xs font-semibold text-green-600 dark:text-green-400">{group.guideName || '---'}</span>,
+        <span className="text-xs font-semibold text-green-600 dark:text-green-400">{group.guide_name || '---'}</span>,
         <Button variant="outline" size="sm" onClick={() => handleAssign(group)}>
-            {group.guideId ? 'Change' : 'Assign'}
+            {group.guide_id ? 'Change' : 'Assign'}
         </Button>
     ]);
 
@@ -175,9 +161,10 @@ const GuideAllocation: React.FC = () => {
                         value={selectedBatchId} 
                         onChange={e => setSelectedBatchId(e.target.value)}
                         className="min-w-[200px] h-9 text-xs font-semibold"
+                        disabled={batches.length === 0}
                     >
-                        {BATCHES.map(b => (
-                            <option key={b.id} value={b.id}>{b.batchName}</option>
+                        {batches.map(b => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
                         ))}
                     </Select>
                 </div>
@@ -214,9 +201,15 @@ const GuideAllocation: React.FC = () => {
                     </div>
                 </div>
 
-                <Table headers={headers} rows={rows} />
+                {isLoading ? (
+                    <div className="flex justify-center py-12">
+                        <Loader2 className="animate-spin text-blue-500" size={32} />
+                    </div>
+                ) : (
+                    <Table headers={headers} rows={rows} />
+                )}
                 
-                {filteredGroups.length === 0 && (
+                {!isLoading && filteredGroups.length === 0 && (
                     <div className="py-24 text-center">
                         <Database size={44} className="mx-auto text-gray-200 dark:text-gray-700 mb-3" />
                         <p className="text-sm font-medium text-[rgb(var(--color-muted))]">No projects found matching your filters.</p>
@@ -238,10 +231,9 @@ const GuideAllocation: React.FC = () => {
                         <div className="space-y-6">
                             <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-[rgb(var(--color-border))]">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <Badge variant={group.type === 'Group' ? 'info' : 'secondary'}>{group.type} Project</Badge>
-                                    <span className="text-[10px] text-[rgb(var(--color-muted))] uppercase font-bold tracking-wider">{group.domain}</span>
+                                    <Badge variant="info">Group Project</Badge>
                                 </div>
-                                <h3 className="text-base font-bold leading-tight">{group.projectTitle}</h3>
+                                <h3 className="text-base font-bold leading-tight">{group.project_title || 'Untitled Project'}</h3>
                             </div>
 
                             <div>
@@ -249,17 +241,14 @@ const GuideAllocation: React.FC = () => {
                                     <Users size={14} /> Group Members
                                 </h4>
                                 <div className="space-y-2">
-                                    {group.members.map(member => (
-                                        <div key={member.id} className="flex items-center justify-between p-3 rounded-lg border border-[rgb(var(--color-border))] bg-white dark:bg-gray-900 shadow-sm">
-                                            <div className="flex items-center gap-3 text-sm">
-                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white ${member.isLeader ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]' : 'bg-blue-500'}`}>
-                                                    {member.name.charAt(0)}
-                                                </div>
-                                                <div className="font-semibold">{member.name}</div>
+                                    <div className="flex items-center justify-between p-3 rounded-lg border border-[rgb(var(--color-border))] bg-white dark:bg-gray-900 shadow-sm">
+                                        <div className="flex items-center gap-3 text-sm">
+                                            <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white bg-blue-500">
+                                                G
                                             </div>
-                                            {member.isLeader && <Badge variant="warning"><Star size={10} className="mr-1 inline fill-amber-500" /> Leader</Badge>}
+                                            <div className="font-semibold">{group.group_name}</div>
                                         </div>
-                                    ))}
+                                    </div>
                                 </div>
                             </div>
 
@@ -269,8 +258,8 @@ const GuideAllocation: React.FC = () => {
                                 </h4>
                                 <Select value={selectedGuideId} onChange={e => setSelectedGuideId(e.target.value)}>
                                     <option value="">-- Choose Guide --</option>
-                                    {GUIDES.map(guide => (
-                                        <option key={guide.id} value={guide.id}>{guide.name} ({guide.specialization})</option>
+                                    {guides.map(guide => (
+                                        <option key={guide.id} value={guide.id}>{guide.name} ({guide.special || 'Faculty'})</option>
                                     ))}
                                 </Select>
                             </div>

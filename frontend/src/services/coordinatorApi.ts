@@ -11,7 +11,7 @@ export const getDeptStats = () => api.get('/coordinator/stats');
 
 // --- 2. Faculty Management ---
 export const getFaculty = () => api.get('/coordinator/faculty');
-export const createFaculty = (data: any) => api.get('/coordinator/faculty', data); // POST in real use
+export const createFaculty = (data: any) => api.post('/coordinator/faculty', data);
 export const updateFaculty = (id: string, data: any) => api.patch(`/coordinator/faculty/${id}`, data);
 
 // --- 3. Batch Management ---

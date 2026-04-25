@@ -74,13 +74,14 @@ export const getBatchesList = async (req: Request, res: Response) => {
 export const assignToDepartment = async (req: Request, res: Response) => {
     try {
         const { departmentId, coordinatorId } = req.body;
-        if (!departmentId || !coordinatorId) {
-            return res.status(400).json({ success: false, message: 'Missing departmentId or coordinatorId' });
+        // coordinatorId can be null to unassign
+        if (!departmentId) {
+            return res.status(400).json({ success: false, message: 'Missing departmentId' });
         }
 
-        const updatedDepartment = await adminService.assignCoordinatorToDepartment(departmentId, coordinatorId);
+        const updatedDepartment = await adminService.assignCoordinatorToDepartment(departmentId, coordinatorId ?? null);
         res.status(200).json(updatedDepartment);
     } catch (error: any) {
-        res.status(500).json({ success: false, message: 'Failed to assign coordinator', error: error.message });
+        res.status(500).json({ success: false, message: 'Failed to assign/unassign coordinator', error: error.message });
     }
 };

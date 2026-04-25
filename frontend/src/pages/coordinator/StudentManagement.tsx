@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Card from '../../components/common/UI/Card';
 import Table from '../../components/common/UI/Table';
 import Button from '../../components/common/UI/Button';
@@ -10,8 +10,10 @@ import Select from '../../components/common/UI/Select';
 import { 
     Search, UserPlus, Upload,
     AtSign, Hash, Layers, CheckCircle, 
-    AlertTriangle, FileSpreadsheet
+    AlertTriangle, FileSpreadsheet, Loader2
 } from 'lucide-react';
+import * as coordApi from '../../services/coordinatorApi';
+import { toast } from 'react-hot-toast';
 
 const StudentManagement: React.FC = () => {
     const [search, setSearch] = useState('');
@@ -20,19 +22,52 @@ const StudentManagement: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'manual' | 'bulk'>('manual');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Realistic Mock Data
-    const students = [
-        { id: 's1', name: 'John Doe', email: 'john.d@stud.edu', roll: 'MCA2401', batch: 'MCA 2024-26 A', guide: 'Dr. Sarah Johnson', group: 'Team Alpha', status: 'Assigned' },
-        { id: 's2', name: 'Jane Smith', email: 'jane.s@stud.edu', roll: 'MCA2402', batch: 'MCA 2024-26 A', guide: 'Dr. Sarah Johnson', group: 'Team Alpha', status: 'Assigned' },
-        { id: 's3', name: 'Alex Rivera', email: 'alex.r@stud.edu', roll: 'MCA2403', batch: 'MCA 2024-26 A', guide: null, group: null, status: 'Unassigned' },
-        { id: 's4', name: 'Michael Chen', email: 'm.chen@stud.edu', roll: 'MSC2305', batch: 'MSc CS 2023-25', guide: 'Prof. Michael Chen', group: 'CyberShield', status: 'Assigned' },
-        { id: 's5', name: 'Sarah Wilson', email: 's.wilson@stud.edu', roll: 'MCA2404', batch: 'MCA 2024-26 B', guide: null, group: null, status: 'Pending Approval' },
-    ];
+    const [students, setStudents] = useState<any[]>([]);
+    const [batches, setBatches] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [newStudent, setNewStudent] = useState({ name: '', email: '', batch_id: '' });
+
+    const fetchInitialData = async () => {
+        try {
+            setIsLoading(true);
+            const [studentsRes, batchesRes] = await Promise.all([
+                coordApi.getStudents(),
+                coordApi.getBatches()
+            ]);
+            if (studentsRes.data?.success) setStudents(studentsRes.data.data);
+            if (batchesRes.data?.success) setBatches(batchesRes.data.data);
+        } catch (error) {
+            toast.error('Failed to load students data');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchInitialData();
+    }, []);
+
+    const handleCreateStudent = async () => {
+        try {
+            await coordApi.createStudent({
+                name: newStudent.name,
+                email: newStudent.email,
+                batch_id: newStudent.batch_id ? parseInt(newStudent.batch_id) : undefined
+            });
+            toast.success('Student registered successfully');
+            setIsAddModalOpen(false);
+            setNewStudent({ name: '', email: '', batch_id: '' });
+            fetchInitialData();
+        } catch (error) {
+            toast.error('Failed to create student');
+        }
+    };
+
 
     const filteredStudents = students.filter(s => {
-        const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) || 
-                           s.roll.toLowerCase().includes(search.toLowerCase());
-        const matchBatch = batchFilter === 'All' || s.batch === batchFilter;
+        const name = s.full_name || '';
+        const matchSearch = name.toLowerCase().includes(search.toLowerCase());
+        const matchBatch = batchFilter === 'All' || s.batch_id === parseInt(batchFilter);
         return matchSearch && matchBatch;
     });
 
@@ -47,29 +82,28 @@ const StudentManagement: React.FC = () => {
     const rows = filteredStudents.map(s => [
         <div className="flex items-center gap-3">
             <div className={`w-9 h-9 rounded-full flex items-center justify-center font-black text-xs shadow-sm
-                ${s.status === 'Assigned' ? 'bg-green-100 text-green-700' : s.status === 'Unassigned' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>
-                {s.name.charAt(0)}
+                ${s.group_name ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                {(s.full_name || '?').charAt(0)}
             </div>
             <div>
-                <p className="font-bold text-sm leading-tight">{s.name}</p>
+                <p className="font-bold text-sm leading-tight">{s.full_name}</p>
                 <div className="flex items-center gap-1 text-[10px] text-[rgb(var(--color-muted))] mt-0.5">
                     <AtSign size={10} /> {s.email}
                 </div>
             </div>
         </div>,
         <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-[rgb(var(--color-primary))]">
-                 <Hash size={12} className="text-gray-400" /> {s.roll}
-            </div>
             <div className="flex items-center gap-1.5 text-[10px] text-[rgb(var(--color-muted))]">
-                 <Layers size={11} className="text-gray-400" /> {s.batch}
+                 <Layers size={11} className="text-gray-400" /> {s.batch_name || 'No Batch'}
             </div>
+            {s.is_leader && (
+                <Badge variant="warning" className="text-[9px] px-1.5 py-0 items-center justify-center max-w-max">Team Leader</Badge>
+            )}
         </div>,
         <div className="flex flex-col gap-0.5 min-w-[120px]">
-            {s.guide ? (
+            {s.group_name ? (
                 <>
-                    <p className="text-xs font-bold truncate">{s.guide}</p>
-                    <p className="text-[10px] text-blue-500 font-medium italic">Group: {s.group}</p>
+                    <p className="text-[10px] text-blue-500 font-medium italic">Group: {s.group_name}</p>
                 </>
             ) : (
                 <div className="flex items-center gap-1 text-[10px] text-red-400 font-bold">
@@ -77,8 +111,8 @@ const StudentManagement: React.FC = () => {
                 </div>
             )}
         </div>,
-        <Badge variant={s.status === 'Assigned' ? 'success' : s.status === 'Unassigned' ? 'danger' : 'warning'}>
-            {s.status}
+        <Badge variant={s.group_name ? 'success' : 'danger'}>
+            {s.group_name ? 'Assigned' : 'Unassigned'}
         </Badge>,
         <div className="flex items-center gap-2">
             <button className="px-2.5 py-1.5 text-[10px] font-black uppercase text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/10 rounded transition-colors">Edit</button>
@@ -125,9 +159,9 @@ const StudentManagement: React.FC = () => {
                                 className="w-48 h-10 border-gray-200"
                              >
                                 <option value="All">All Batches</option>
-                                <option>MCA 2024-26 A</option>
-                                <option>MCA 2024-26 B</option>
-                                <option>MSc CS 2023-25</option>
+                                {batches.map(b => (
+                                    <option key={b.id} value={b.id}>{b.name}</option>
+                                ))}
                              </Select>
                         </div>
                         <div className="w-px h-6 bg-gray-200 hidden md:block"></div>
@@ -139,7 +173,13 @@ const StudentManagement: React.FC = () => {
             </Card>
 
             <Card className="overflow-hidden border-none shadow-xl shadow-gray-100 dark:shadow-none">
-                <Table headers={headers} rows={rows} />
+                {isLoading ? (
+                    <div className="flex justify-center p-8">
+                        <Loader2 className="animate-spin text-blue-500" />
+                    </div>
+                ) : (
+                    <Table headers={headers} rows={rows} />
+                )}
             </Card>
 
             <Modal
@@ -168,27 +208,29 @@ const StudentManagement: React.FC = () => {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <Label>Full Name</Label>
-                                    <Input placeholder="e.g. Alice Cooper" />
+                                    <Input value={newStudent.name} onChange={e => setNewStudent({...newStudent, name: e.target.value})} placeholder="e.g. Alice Cooper" />
                                 </div>
                                 <div>
                                     <Label>Roll Number</Label>
-                                    <Input placeholder="MCA2501" />
+                                    <Input placeholder="Not needed" disabled />
                                 </div>
                             </div>
                             <div>
                                 <Label>Official Email</Label>
-                                <Input type="email" placeholder="alice.c@student.univ.edu" />
+                                <Input type="email" value={newStudent.email} onChange={e => setNewStudent({...newStudent, email: e.target.value})} placeholder="alice.c@student.univ.edu" />
                             </div>
                             <div>
                                 <Label>Assigned Batch</Label>
-                                <Select>
-                                    <option>MCA 2024-26 Batch A</option>
-                                    <option>MCA 2024-26 Batch B</option>
+                                <Select value={newStudent.batch_id} onChange={e => setNewStudent({...newStudent, batch_id: e.target.value})}>
+                                    <option value="">Select a batch...</option>
+                                    {batches.map(b => (
+                                        <option key={b.id} value={b.id}>{b.name}</option>
+                                    ))}
                                 </Select>
                             </div>
                             <div className="flex gap-3 pt-4 border-t border-[rgb(var(--color-border))]">
                                 <Button variant="outline" className="flex-1" onClick={() => setIsAddModalOpen(false)}>Cancel</Button>
-                                <Button variant="primary" className="flex-1">Add Student</Button>
+                                <Button variant="primary" className="flex-1" onClick={handleCreateStudent}>Add Student</Button>
                             </div>
                         </div>
                     ) : (

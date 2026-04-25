@@ -40,7 +40,7 @@ const Login: React.FC = () => {
 
           {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold mb-3">Welcome Back</h1>
+            <h1 className="text-3xl font-bold mb-3">Sign In</h1>
             <p className="text-[rgb(var(--color-muted))] text-sm">
               Sign in to the Academic Project Monitoring System
             </p>
