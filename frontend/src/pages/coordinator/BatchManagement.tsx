@@ -19,7 +19,53 @@ const BatchManagement: React.FC = () => {
     const [search, setSearch] = useState('');
     const [batches, setBatches] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [newBatch, setNewBatch] = useState({ name: '', start_year: '', end_year: '' });
+    const [newBatch, setNewBatch] = useState({ 
+        name: '', 
+        start_year: '', 
+        end_year: '',
+        topic_submission_start: '',
+        topic_submission_end: '',
+        project_type_mode: 'mixed',
+        max_group_size: 3
+    });
+    const [editingBatch, setEditingBatch] = useState<any>(null);
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+    const [activeFaculty, setActiveFaculty] = useState<any[]>([]);
+    const [assignedFacultyIds, setAssignedFacultyIds] = useState<number[]>([]);
+    const [isFetchingFaculty, setIsFetchingFaculty] = useState(false);
+    const [isFacultyModalOpen, setIsFacultyModalOpen] = useState(false);
+
+    useEffect(() => {
+        coordApi.getFaculty().then(res => {
+            if (res.data?.success) {
+                setActiveFaculty(res.data.data.filter((f: any) => f.status === 'active'));
+            }
+        }).catch(console.error);
+    }, []);
+
+    const handleOpenSettings = (batch: any) => {
+        setEditingBatch(batch);
+        setIsSettingsModalOpen(true);
+    };
+
+    const handleOpenFacultyModal = async (batch: any) => {
+        setEditingBatch(batch);
+        setIsFacultyModalOpen(true);
+        setIsFetchingFaculty(true);
+        try {
+            const res = await coordApi.getBatchFaculty(batch.id);
+            if (res.data?.success) {
+                setAssignedFacultyIds(res.data.data.map((f: any) => f.id));
+            }
+        } catch (e) {}
+        setIsFetchingFaculty(false);
+    };
+
+    const handleToggleFaculty = (id: number) => {
+        setAssignedFacultyIds(prev => 
+            prev.includes(id) ? prev.filter(fId => fId !== id) : [...prev, id]
+        );
+    };
 
     const fetchBatches = async () => {
         try {
@@ -43,16 +89,52 @@ const BatchManagement: React.FC = () => {
     const handleCreateBatch = async () => {
         try {
             await coordApi.createBatch({
-                name: newBatch.name,
+                ...newBatch,
                 start_year: parseInt(newBatch.start_year),
                 end_year: parseInt(newBatch.end_year)
             });
             toast.success('Batch created successfully');
             setIsAddModalOpen(false);
-            setNewBatch({ name: '', start_year: '', end_year: '' });
+            setNewBatch({ 
+                name: '', start_year: '', end_year: '', 
+                topic_submission_start: '', topic_submission_end: '', 
+                project_type_mode: 'mixed', max_group_size: 3 
+            });
             fetchBatches();
         } catch (error) {
             toast.error('Failed to create batch');
+        }
+    };
+
+    const handleUpdateBatch = async () => {
+        if (!editingBatch) return;
+        try {
+            await coordApi.updateBatch(editingBatch.id, {
+                topic_submission_start: editingBatch.topic_submission_start,
+                topic_submission_end: editingBatch.topic_submission_end,
+                project_type_mode: editingBatch.project_type_mode,
+                is_active: editingBatch.is_active,
+                max_group_size: editingBatch.max_group_size
+            });
+            toast.success('Batch settings updated');
+            setIsSettingsModalOpen(false);
+            setEditingBatch(null);
+            fetchBatches();
+        } catch (error) {
+            toast.error('Failed to update batch');
+        }
+    };
+
+    const handleSaveFaculty = async () => {
+        if (!editingBatch) return;
+        try {
+            await coordApi.setBatchFaculty(editingBatch.id, { facultyIds: assignedFacultyIds });
+            toast.success('Faculty assignments updated');
+            setIsFacultyModalOpen(false);
+            setEditingBatch(null);
+            fetchBatches();
+        } catch (error) {
+            toast.error('Failed to update assignments');
         }
     };
 
@@ -106,10 +188,16 @@ const BatchManagement: React.FC = () => {
             {b.is_active ? 'Active' : 'Archived'}
         </Badge>,
         <div className="flex gap-2">
-            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300 rounded-lg text-[11px] font-black hover:bg-blue-600 hover:text-white transition-all">
-                VIEW DETAILS <ChevronRight size={14} />
+            <button 
+                onClick={() => handleOpenFacultyModal(b)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300 rounded-lg text-[11px] font-black hover:bg-blue-600 hover:text-white transition-all"
+            >
+                ASSIGN FACULTY <ChevronRight size={14} />
             </button>
-            <button className="p-2 bg-gray-50 dark:bg-gray-800 rounded-lg text-gray-500 hover:text-blue-600 transition-colors">
+            <button 
+                onClick={() => handleOpenSettings(b)}
+                className="p-2 bg-gray-50 dark:bg-gray-800 rounded-lg text-gray-500 hover:text-blue-600 transition-colors"
+            >
                 <Settings size={16} />
             </button>
         </div>
@@ -198,15 +286,169 @@ const BatchManagement: React.FC = () => {
                             <Input type="number" value={newBatch.end_year} onChange={e => setNewBatch({...newBatch, end_year: e.target.value})} placeholder="2027" />
                         </div>
                     </div>
-                    <div>
-                        <Label>Department</Label>
-                        <Input value="Dynamic (from Coordinator profile)" disabled className="bg-gray-100" />
-                        <p className="text-[10px] text-gray-500 mt-1 italic">Batches are automatically associated with your managed department.</p>
+                    
+                    <div className="pt-4 border-t border-[rgb(var(--color-border))]">
+                        <h4 className="text-xs font-black uppercase tracking-widest text-blue-600 mb-4">Initial Topic Submission Window</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <Label>Window Start</Label>
+                                <Input type="date" value={newBatch.topic_submission_start} onChange={e => setNewBatch({...newBatch, topic_submission_start: e.target.value})} />
+                            </div>
+                            <div>
+                                <Label>Window End</Label>
+                                <Input type="date" value={newBatch.topic_submission_end} onChange={e => setNewBatch({...newBatch, topic_submission_end: e.target.value})} />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label>Project Mode Enforcement</Label>
+                            <select 
+                                className="w-full h-10 px-3 rounded-lg border border-[rgb(var(--color-border))] bg-white dark:bg-gray-900 text-sm mt-1"
+                                value={newBatch.project_type_mode} 
+                                onChange={e => setNewBatch({...newBatch, project_type_mode: e.target.value})}
+                            >
+                                <option value="mixed">Mixed (Allow Individual & Group)</option>
+                                <option value="individual">Individual Only</option>
+                                <option value="group">Group Projects Only</option>
+                            </select>
+                        </div>
+                        {newBatch.project_type_mode !== 'individual' && (
+                        <div>
+                            <Label>Maximum Group Size</Label>
+                            <Input 
+                                type="number" 
+                                min="2" 
+                                max="10" 
+                                className="mt-1"
+                                value={newBatch.max_group_size} 
+                                onChange={e => setNewBatch({...newBatch, max_group_size: parseInt(e.target.value) || 3})} 
+                            />
+                        </div>
+                        )}
                     </div>
 
                     <div className="flex gap-3 pt-4 border-t border-[rgb(var(--color-border))]">
                         <Button variant="outline" className="flex-1" onClick={() => setIsAddModalOpen(false)}>Cancel</Button>
                         <Button variant="primary" className="flex-1" onClick={handleCreateBatch}>Create Batch</Button>
+                    </div>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={isSettingsModalOpen}
+                onClose={() => setIsSettingsModalOpen(false)}
+                title={`Batch Settings: ${editingBatch?.name}`}
+            >
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+                        <div>
+                            <p className="text-xs font-bold">Active Status</p>
+                            <p className="text-[10px] text-gray-500">Enable or disable this batch</p>
+                        </div>
+                        <input 
+                            type="checkbox" 
+                            checked={editingBatch?.is_active} 
+                            onChange={e => setEditingBatch({...editingBatch, is_active: e.target.checked})}
+                            className="w-5 h-5 accent-blue-600"
+                        />
+                    </div>
+
+                    <div>
+                        <h4 className="text-xs font-black uppercase tracking-widest text-blue-600 mb-4">Topic Submission Window</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <Label>Window Start</Label>
+                                <Input 
+                                    type="date" 
+                                    value={editingBatch?.topic_submission_start ? new Date(editingBatch.topic_submission_start).toISOString().split('T')[0] : ''} 
+                                    onChange={e => setEditingBatch({...editingBatch, topic_submission_start: e.target.value})} 
+                                />
+                            </div>
+                            <div>
+                                <Label>Window End</Label>
+                                <Input 
+                                    type="date" 
+                                    value={editingBatch?.topic_submission_end ? new Date(editingBatch.topic_submission_end).toISOString().split('T')[0] : ''} 
+                                    onChange={e => setEditingBatch({...editingBatch, topic_submission_end: e.target.value})} 
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label>Project Mode Enforcement</Label>
+                            <select 
+                                className="w-full h-10 px-3 rounded-lg border border-[rgb(var(--color-border))] bg-white dark:bg-gray-900 text-sm mt-1"
+                                value={editingBatch?.project_type_mode} 
+                                onChange={e => setEditingBatch({...editingBatch, project_type_mode: e.target.value})}
+                            >
+                                <option value="mixed">Mixed (Allow Individual & Group)</option>
+                                <option value="individual">Individual Only</option>
+                                <option value="group">Group Projects Only</option>
+                            </select>
+                        </div>
+                        {editingBatch?.project_type_mode !== 'individual' && (
+                        <div>
+                            <Label>Maximum Group Size</Label>
+                            <Input 
+                                type="number" 
+                                min="2" 
+                                max="10" 
+                                className="mt-1"
+                                value={editingBatch?.max_group_size || 3} 
+                                onChange={e => setEditingBatch({...editingBatch, max_group_size: parseInt(e.target.value) || 3})} 
+                            />
+                        </div>
+                        )}
+                    </div>
+
+                    <div className="flex gap-3 pt-4 border-t border-[rgb(var(--color-border))]">
+                        <Button variant="outline" className="flex-1" onClick={() => setIsSettingsModalOpen(false)}>Cancel</Button>
+                        <Button variant="primary" className="flex-1" onClick={handleUpdateBatch}>Save Changes</Button>
+                    </div>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={isFacultyModalOpen}
+                onClose={() => setIsFacultyModalOpen(false)}
+                title={`Assign Faculty: ${editingBatch?.name}`}
+            >
+                <div className="space-y-4">
+                    <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+                        <p className="text-[10px] text-gray-500 mb-4 leading-tight">
+                            Only faculties designated as 'Active' are available for assignment to a batch. The auto-assign feature will strictly allocate students to the faculty members selected below.
+                        </p>
+                        {isFetchingFaculty ? (
+                            <div className="flex justify-center p-4"><Loader2 className="animate-spin text-blue-500" /></div>
+                        ) : activeFaculty.length === 0 ? (
+                            <div className="p-4 bg-orange-50 text-orange-600 text-xs font-bold rounded-lg text-center border border-orange-100">
+                                No active faculties found in your department. Go to the Faculty Hub to mark accounts as active.
+                            </div>
+                        ) : (
+                            activeFaculty.map(f => (
+                                <div key={f.id} className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-300 transition-colors cursor-pointer" onClick={() => handleToggleFaculty(f.id)}>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={assignedFacultyIds.includes(f.id)}
+                                        onChange={() => {}} // Handled by div onClick
+                                        className="w-4 h-4 accent-blue-600 cursor-pointer pointer-events-none"
+                                    />
+                                    <div className="flex-1 pointer-events-none">
+                                        <p className="text-sm font-bold">{f.name}</p>
+                                        <p className="text-[10px] text-gray-500">{f.email}</p>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    <div className="flex gap-3 pt-4 border-t border-[rgb(var(--color-border))]">
+                        <Button variant="outline" className="flex-1" onClick={() => setIsFacultyModalOpen(false)}>Cancel</Button>
+                        <Button variant="primary" className="flex-1" onClick={handleSaveFaculty}>Save Assignments</Button>
                     </div>
                 </div>
             </Modal>

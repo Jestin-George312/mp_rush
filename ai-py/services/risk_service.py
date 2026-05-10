@@ -131,7 +131,7 @@ def compute_risk_scores() -> int:
                VALUES ('project', %s, %s, %s, %s, NOW())
                ON CONFLICT (entity_type, entity_id)
                DO UPDATE SET risk_score = %s, risk_level = %s, factors = %s, predicted_at = NOW()""",
-            ("project", proj["project_id"], score, level, json.dumps(factors),
+            (proj["project_id"], score, level, json.dumps(factors),
              score, level, json.dumps(factors)),
         )
         updated += 1

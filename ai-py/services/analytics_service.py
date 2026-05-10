@@ -26,7 +26,7 @@ def get_guide_effectiveness(dept_id: int = None) -> list:
             LEFT JOIN projects p ON p.group_id = g.id
             LEFT JOIN tasks t ON t.project_id = p.id
             LEFT JOIN documents doc ON doc.project_id = p.id
-            WHERE u.role = 'guide' AND u.is_deleted = FALSE {filt}
+            WHERE u.role = 'guide'  {filt}
             GROUP BY u.uid, pr.full_name ORDER BY AVG(p.progress) DESC NULLS LAST""",
         params,
     )
@@ -112,7 +112,7 @@ def get_workload_fairness() -> dict:
     rows = query(
         """SELECT u.uid AS guide_id, pr.full_name, COUNT(g.id)::int AS load
            FROM users u LEFT JOIN profiles pr ON pr.u_id = u.uid LEFT JOIN groups g ON g.guide_id = u.uid
-           WHERE u.role = 'guide' AND u.is_deleted = FALSE
+           WHERE u.role = 'guide' 
            GROUP BY u.uid, pr.full_name ORDER BY load DESC"""
     )
     loads = [r["load"] for r in rows]

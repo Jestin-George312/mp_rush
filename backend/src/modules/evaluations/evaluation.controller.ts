@@ -6,13 +6,19 @@ import logger from '../../utils/logger';
 export const saveRubric = async (req: Request, res: Response) => {
     try {
         const userId = req.user!.id;
-        const { name, totalScore, criteria } = req.body;
+        const { name, totalScore, criteria, batch_id, deadline_id } = req.body;
 
-        if (!name || !totalScore || !criteria) {
+        if (!name || !totalScore || !criteria || !batch_id) {
             return sendError(res, 'Missing required fields', 400);
         }
 
-        const rubric = await evalService.saveRubric(userId, { name, totalScore, criteria });
+        const rubric = await evalService.saveRubric(userId, { 
+            name, 
+            totalScore, 
+            criteria, 
+            batch_id: parseInt(batch_id),
+            deadline_id: deadline_id ? parseInt(deadline_id) : undefined 
+        });
         sendSuccess(res, rubric, 'Rubric saved', 201);
     } catch (error: any) {
         logger.error('saveRubric error:', error.message);
@@ -22,7 +28,8 @@ export const saveRubric = async (req: Request, res: Response) => {
 
 export const getRubrics = async (req: Request, res: Response) => {
     try {
-        const rubrics = await evalService.getRubrics();
+        const batchId = req.query.batchId ? parseInt(req.query.batchId as string) : undefined;
+        const rubrics = await evalService.getRubrics(batchId);
         sendSuccess(res, rubrics);
     } catch (error: any) {
         logger.error('getRubrics error:', error.message);
@@ -33,13 +40,13 @@ export const getRubrics = async (req: Request, res: Response) => {
 export const submitScores = async (req: Request, res: Response) => {
     try {
         const userId = req.user!.id;
-        const { rubric_id, group_id, scores, total } = req.body;
+        const { rubric_id, group_id, scores, total, feedback } = req.body;
 
         if (!rubric_id || !group_id || !scores || total === undefined) {
             return sendError(res, 'Missing required fields', 400);
         }
 
-        const scoreRecord = await evalService.submitScores(userId, { rubric_id, group_id, scores, total });
+        const scoreRecord = await evalService.submitScores(userId, { rubric_id, group_id, scores, total, feedback });
         sendSuccess(res, scoreRecord, 'Scores submitted successfully');
     } catch (error: any) {
         logger.error('submitScores error:', error.message);

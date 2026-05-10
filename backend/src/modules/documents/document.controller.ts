@@ -10,10 +10,10 @@ export const uploadDocument = async (req: Request, res: Response) => {
 
         if (!req.file) return sendError(res, 'No file uploaded', 400);
 
-        const { project_id, type } = req.body;
+        const { project_id, type, parent_doc_id } = req.body;
         if (!project_id) return sendError(res, 'project_id is required', 400);
 
-        const allowedTypes = ['SRS', 'Reports', 'Diagrams', 'Other'];
+        const allowedTypes = ['Proposal', 'Review-1', 'Review-2', 'Final Report', 'Presentation', 'Other'];
         const docType = allowedTypes.includes(type) ? type : 'Other';
 
         const doc = await docService.uploadDocument(userId, {
@@ -21,6 +21,7 @@ export const uploadDocument = async (req: Request, res: Response) => {
             type: docType as any,
             filename: req.file.filename,
             originalname: req.file.originalname,
+            parent_doc_id: parent_doc_id ? parseInt(parent_doc_id) : undefined,
         });
 
         sendSuccess(res, doc, 'Document uploaded successfully', 201);
@@ -60,13 +61,13 @@ export const downloadDocument = async (req: Request, res: Response) => {
 export const updateDocumentStatus = async (req: Request, res: Response) => {
     try {
         const docId = parseInt(req.params.id as string);
-        const { status } = req.body;
+        const { status, feedback } = req.body;
 
-        if (!['Approved', 'Rejected'].includes(status)) {
-            return sendError(res, 'status must be "Approved" or "Rejected"', 400);
+        if (!['Approved', 'Rejected', 'Needs Revision'].includes(status)) {
+            return sendError(res, 'status must be "Approved", "Rejected", or "Needs Revision"', 400);
         }
 
-        const doc = await docService.updateDocumentStatus(docId, status);
+        const doc = await docService.updateDocumentStatus(docId, status, req.user!.id, feedback);
         sendSuccess(res, doc, `Document ${status}`);
     } catch (error: any) {
         logger.error('updateDocumentStatus error:', error.message);

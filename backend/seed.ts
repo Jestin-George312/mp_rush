@@ -48,10 +48,12 @@ const seed = async () => {
 
         // Students
         const studentEmails = [
-            'student1@sjcetpalai.ac.in',
-            'student2@sjcetpalai.ac.in',
-            'student3@sjcetpalai.ac.in',
-            'student4@sjcetpalai.ac.in'
+            'student1@test.apms',
+            'student2@test.apms',
+            'student3@test.apms',
+            'student4@test.apms',
+            'student5@test.apms',
+            'student6@test.apms'
         ];
         const studentUids: number[] = [];
         for (const email of studentEmails) {
@@ -74,6 +76,8 @@ const seed = async () => {
             { uid: studentUids[1], name: 'Student Two' },
             { uid: studentUids[2], name: 'Student Three' },
             { uid: studentUids[3], name: 'Student Four' },
+            { uid: studentUids[4], name: 'Student Five' },
+            { uid: studentUids[5], name: 'Student Six' },
         ];
 
         for (const user of users) {
@@ -101,34 +105,52 @@ const seed = async () => {
 
         // 6. Create Groups
         console.log('👥 Creating groups...');
+        // Group 1: Student 1 & 2
         const group1Res = await pool.query(
             "INSERT INTO groups (group_name, batch_id, guide_id) VALUES ($1, $2, $3) RETURNING id",
-            ['Team Alpha', batchId, guide1Uid]
+            ['ML Viz Team', batchId, guide1Uid]
         );
+        const group1Id = group1Res.rows[0].id;
+
+        // Group 2: Student 3 & 4
         const group2Res = await pool.query(
             "INSERT INTO groups (group_name, batch_id, guide_id) VALUES ($1, $2, $3) RETURNING id",
             ['Team Beta', batchId, guide2Uid]
         );
-        const group1Id = group1Res.rows[0].id;
         const group2Id = group2Res.rows[0].id;
+
+        // Group 3: Student 5 (Individual)
+        const group3Res = await pool.query(
+            "INSERT INTO groups (group_name, batch_id, guide_id) VALUES ($1, $2, $3) RETURNING id",
+            ['Individual_Student5', batchId, guide1Uid]
+        );
+        const group3Id = group3Res.rows[0].id;
 
         // 7. Group Members
         console.log('🔗 Assigning group members...');
         await pool.query("INSERT INTO group_members (group_id, student_id, is_leader) VALUES ($1, $2, $3)", [group1Id, studentUids[0], true]);
         await pool.query("INSERT INTO group_members (group_id, student_id, is_leader) VALUES ($1, $2, $3)", [group1Id, studentUids[1], false]);
+        
         await pool.query("INSERT INTO group_members (group_id, student_id, is_leader) VALUES ($1, $2, $3)", [group2Id, studentUids[2], true]);
         await pool.query("INSERT INTO group_members (group_id, student_id, is_leader) VALUES ($1, $2, $3)", [group2Id, studentUids[3], false]);
+
+        await pool.query("INSERT INTO group_members (group_id, student_id, is_leader) VALUES ($1, $2, $3)", [group3Id, studentUids[4], true]);
 
         // 8. Projects
         console.log('📂 Creating projects...');
         await pool.query(
             "INSERT INTO projects (group_id, title, domain, description, status, submitted_by) VALUES ($1, $2, $3, $4, $5, $6)",
-            [group1Id, 'AI Powered Traffic System', 'Artificial Intelligence', 'A system to control traffic using AI.', 'approved', studentUids[0]]
+            [group1Id, 'ML Vizualization', 'Machine Learning', 'ML Algorithm Vizualization project.', 'approved', studentUids[0]]
         );
         await pool.query(
             "INSERT INTO projects (group_id, title, domain, description, status, submitted_by) VALUES ($1, $2, $3, $4, $5, $6)",
             [group2Id, 'Blockchain for Supply Chain', 'Blockchain', 'Ensuring transparency in supply chains.', 'pending', studentUids[2]]
         );
+        await pool.query(
+            "INSERT INTO projects (group_id, title, domain, description, status, submitted_by) VALUES ($1, $2, $3, $4, $5, $6)",
+            [group3Id, 'Smart Agriculture IoT', 'IoT', 'IoT based smart agriculture system.', 'pending', studentUids[4]]
+        );
+
 
         console.log('✅ Seeding completed successfully!');
     } catch (error) {

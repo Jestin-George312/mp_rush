@@ -17,7 +17,7 @@ export const verifyGoogleTokenAndLogin = async (token: string) => {
     const { email, name, sub: googleId, picture } = payload;
 
     // 2. Check if user exists in the database
-    let userResult = await pool.query('SELECT * FROM users WHERE email = $1 AND is_deleted = FALSE', [email]);
+    let userResult = await pool.query('SELECT * FROM users WHERE email = $1 ', [email]);
     let user = userResult.rows[0];
 
     if (!user) {
@@ -56,6 +56,8 @@ export const verifyGoogleTokenAndLogin = async (token: string) => {
     const internalToken = jwt.sign(jwtPayload, process.env.JWT_SECRET as string, {
         expiresIn: '24h'
     });
+
+    await pool.query('UPDATE users SET is_active = TRUE WHERE uid = $1', [user.uid]);
 
     return {
         message: 'Login successful',

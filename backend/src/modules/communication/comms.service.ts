@@ -13,12 +13,12 @@ export const getMessages = async (groupId: number) => {
     return result.rows;
 };
 
-export const sendMessage = async (groupId: number, senderId: number, text: string) => {
+export const sendMessage = async (groupId: number, senderId: number, text: string, attachmentUrl?: string) => {
     const result = await pool.query(
-        `INSERT INTO messages (group_id, sender_id, text)
-         VALUES ($1, $2, $3)
+        `INSERT INTO messages (group_id, sender_id, text, attachment_url)
+         VALUES ($1, $2, $3, $4)
          RETURNING *`,
-        [groupId, senderId, text]
+        [groupId, senderId, text, attachmentUrl || null]
     );
 
     // Fetch the inserted message with profile details to return to the client

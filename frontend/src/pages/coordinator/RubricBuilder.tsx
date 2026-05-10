@@ -1,382 +1,342 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Card from '../../components/common/UI/Card';
+import Table from '../../components/common/UI/Table';
 import Button from '../../components/common/UI/Button';
 import Badge from '../../components/common/UI/Badge';
 import Modal from '../../components/common/UI/Modal';
 import Input from '../../components/common/UI/Input';
 import Label from '../../components/common/UI/Label';
-import {
-    Calendar, FileSpreadsheet, Plus, Trash2, Clock, Info,
-    Upload, Edit3, Target
+import Select from '../../components/common/UI/Select';
+import { 
+    Plus, Trash2, BookOpen, Loader2, 
+    ClipboardCheck, ListChecks, Target,
+    AlertCircle, Save
 } from 'lucide-react';
+import * as coordApi from '../../services/coordinatorApi';
+import { toast } from 'react-hot-toast';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-interface GlobalDeadline {
-    id: string;
-    name: string;
+interface Criterion {
     description: string;
-    date: string;
-    maxScore: number;
-    batchId: string;
+    maxMarks: number;
 }
 
-interface Batch {
-    id: string;
-    batchName: string;
-    program: string;
-    year: string;
+interface Rubric {
+    id: number;
+    name: string;
+    total_score: number;
+    criteria: Criterion[];
+    batch_id: number;
+    deadline_id?: number;
+    created_at: string;
+    created_by_name?: string;
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-const BATCHES: Batch[] = [
-    { id: 'b1', batchName: 'MCA 2024-26 Batch A', program: 'MCA', year: '2024-26' },
-    { id: 'b2', batchName: 'MCA 2024-26 Batch B', program: 'MCA', year: '2024-26' },
-    { id: 'b3', batchName: 'MCA 2023-25 Batch A', program: 'MCA', year: '2023-25' },
-];
-
-const INITIAL_DEADLINES: GlobalDeadline[] = [
-    {
-        id: 'd1',
-        name: 'Topic Submission',
-        description: 'Submission of project title and domain for approval.',
-        date: '2024-06-15',
-        maxScore: 10,
-        batchId: 'b1'
-    },
-    {
-        id: 'd2',
-        name: 'Abstract Submission',
-        description: 'Detailing project objectives and methodology.',
-        date: '2024-07-20',
-        maxScore: 20,
-        batchId: 'b1'
-    },
-    {
-        id: 'd3',
-        name: 'Mid-Review',
-        description: 'First phase implementation review.',
-        date: '2024-09-10',
-        maxScore: 30,
-        batchId: 'b1'
-    }
-];
-
-// ─── Component ────────────────────────────────────────────────────────────────
 const RubricBuilder: React.FC = () => {
-    const [batches] = useState<Batch[]>(BATCHES);
-    const [deadlines, setDeadlines] = useState<GlobalDeadline[]>(INITIAL_DEADLINES);
-
-    // Context & UI State
-    const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
+    const [selectedBatch, setSelectedBatch] = useState<string>('');
+    const [batches, setBatches] = useState<any[]>([]);
+    const [rubrics, setRubrics] = useState<Rubric[]>([]);
+    const [deadlines, setDeadlines] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<'excel' | 'manual'>('excel');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Manual Form State
-    const [formData, setFormData] = useState({
+    // Form State
+    const [newRubric, setNewRubric] = useState({
         name: '',
-        description: '',
-        date: '',
-        maxScore: 0
+        batch_id: '',
+        deadline_id: '',
+        criteria: [{ description: '', maxMarks: 0 }] as Criterion[]
     });
 
-    // Excel Import State
-    const [importedRows, setImportedRows] = useState<{ name: string; desc: string; date: string; score: number }[]>([]);
-    const [importFileName, setImportFileName] = useState('');
-
-    // ── Derived ────────────────────────────────────────────────────────────────
-    const selectedBatch = useMemo(() => batches.find(b => b.id === selectedBatchId) ?? null, [selectedBatchId]);
-    
-    const batchDeadlines = useMemo(() => {
-        return deadlines
-            .filter(d => d.batchId === selectedBatchId)
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    }, [deadlines, selectedBatchId]);
-
-    const totalAvailableScore = useMemo(() => {
-        return batchDeadlines.reduce((sum, d) => sum + d.maxScore, 0);
-    }, [batchDeadlines]);
-
-    // ── Handlers ──────────────────────────────────────────────────────────────
-    const handleAddManual = () => {
-        if (!formData.name || !formData.date || !selectedBatchId) return;
-
-        const newDeadline: GlobalDeadline = {
-            id: `d-${Date.now()}`,
-            ...formData,
-            batchId: selectedBatchId
+    useEffect(() => {
+        const fetchInitial = async () => {
+            try {
+                const bRes = await coordApi.getBatches();
+                if (bRes.data?.success && bRes.data.data.length > 0) {
+                    setBatches(bRes.data.data);
+                    setSelectedBatch(bRes.data.data[0].id.toString());
+                } else {
+                    setIsLoading(false);
+                }
+            } catch (err) {
+                toast.error('Failed to load batches');
+                setIsLoading(false);
+            }
         };
+        fetchInitial();
+    }, []);
 
-        setDeadlines(prev => [...prev, newDeadline]);
-        setFormData({ name: '', description: '', date: '', maxScore: 0 });
-        setIsAddModalOpen(false);
+    const fetchData = async () => {
+        if (!selectedBatch) return;
+        try {
+            setIsLoading(true);
+            const [rubRes, dlRes] = await Promise.all([
+                coordApi.getRubrics(parseInt(selectedBatch)),
+                coordApi.getDeadlines(selectedBatch)
+            ]);
+            if (rubRes.data?.success) setRubrics(rubRes.data.data);
+            if (dlRes.data?.success) setDeadlines(dlRes.data.data);
+        } catch (error) {
+            toast.error('Failed to load rubrics');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        setImportFileName(file.name);
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            const text = ev.target?.result as string;
-            const lines = text.split('\n').filter(Boolean);
-            const parsed = lines.slice(1).map(line => {
-                const p = line.split(',').map(s => s.trim());
-                return { 
-                    name: p[0] || '', 
-                    desc: p[1] || '', 
-                    date: p[2] || '', 
-                    score: parseInt(p[3]) || 0 
-                };
-            }).filter(row => row.name && row.date);
-            setImportedRows(parsed);
-        };
-        reader.readAsText(file);
-    };
+    useEffect(() => {
+        fetchData();
+        setNewRubric(prev => ({ ...prev, batch_id: selectedBatch }));
+    }, [selectedBatch]);
 
-    const handleImportConfirm = () => {
-        if (!selectedBatchId) return;
-        const newDls: GlobalDeadline[] = importedRows.map(row => ({
-            id: `d-imp-${Math.random().toString(36).slice(2, 7)}`,
-            name: row.name,
-            description: row.desc,
-            date: row.date,
-            maxScore: row.score,
-            batchId: selectedBatchId
+    const handleAddCriterion = () => {
+        setNewRubric(prev => ({
+            ...prev,
+            criteria: [...prev.criteria, { description: '', maxMarks: 0 }]
         }));
-        
-        setDeadlines(prev => [...prev, ...newDls]);
-        setIsAddModalOpen(false);
-        setImportedRows([]);
-        setImportFileName('');
     };
 
-    const handleDelete = (id: string) => {
-        setDeadlines(prev => prev.filter(d => d.id !== id));
+    const handleRemoveCriterion = (index: number) => {
+        setNewRubric(prev => ({
+            ...prev,
+            criteria: prev.criteria.filter((_, i) => i !== index)
+        }));
     };
+
+    const handleCriterionChange = (index: number, field: keyof Criterion, value: string | number) => {
+        const updated = [...newRubric.criteria];
+        updated[index] = { ...updated[index], [field]: value };
+        setNewRubric(prev => ({ ...prev, criteria: updated }));
+    };
+
+    const totalScore = useMemo(() => {
+        return newRubric.criteria.reduce((sum, c) => sum + (Number(c.maxMarks) || 0), 0);
+    }, [newRubric.criteria]);
+
+    const handleSaveRubric = async () => {
+        if (!newRubric.name || !newRubric.batch_id || newRubric.criteria.length === 0) {
+            toast.error('Please fill all required fields');
+            return;
+        }
+
+        if (newRubric.criteria.some(c => !c.description || c.maxMarks <= 0)) {
+            toast.error('All criteria must have a description and marks > 0');
+            return;
+        }
+
+        try {
+            setIsSubmitting(true);
+            await coordApi.createRubric({
+                name: newRubric.name,
+                batch_id: parseInt(newRubric.batch_id),
+                deadline_id: newRubric.deadline_id ? parseInt(newRubric.deadline_id) : undefined,
+                totalScore: totalScore,
+                criteria: newRubric.criteria
+            });
+            toast.success('Evaluation Rubric published successfully');
+            setIsAddModalOpen(false);
+            setNewRubric({
+                name: '',
+                batch_id: selectedBatch,
+                deadline_id: '',
+                criteria: [{ description: '', maxMarks: 0 }]
+            });
+            fetchData();
+        } catch (error) {
+            toast.error('Failed to create rubric');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const headers = ['Rubric Name', 'Total Weightage', 'Criteria Breakdown', 'Academic Link', 'Created By', 'Actions'];
+    const rows = rubrics.map(r => [
+        <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 rounded-xl flex items-center justify-center">
+                <ClipboardCheck size={18} />
+            </div>
+            <span className="font-bold text-sm">{r.name}</span>
+        </div>,
+        <Badge variant="info" className="font-black">{r.total_score} Pts</Badge>,
+        <div className="flex flex-col gap-1 max-w-xs">
+            {r.criteria.slice(0, 2).map((c, i) => (
+                <div key={i} className="flex justify-between text-[10px] bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded border border-gray-100 dark:border-gray-700">
+                    <span className="truncate mr-2">{c.description}</span>
+                    <span className="font-bold">{c.maxMarks}m</span>
+                </div>
+            ))}
+            {r.criteria.length > 2 && <span className="text-[9px] text-gray-400 font-bold ml-1">+{r.criteria.length - 2} more criteria</span>}
+        </div>,
+        <div className="text-[10px] font-medium text-gray-500 italic">
+            {r.deadline_id ? deadlines.find(d => d.id === r.deadline_id)?.title || 'Global' : 'Independent Assessment'}
+        </div>,
+        <span className="text-xs font-medium text-gray-400">{r.created_by_name || 'System'}</span>,
+        <div className="flex gap-2">
+            <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors text-gray-400">
+                <Trash2 size={16} />
+            </button>
+        </div>
+    ]);
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold">Global Timeline</h1>
-                    <p className="text-[rgb(var(--color-muted))] mt-1">Define deadlines and evaluation rubrics for each batch</p>
+                    <h1 className="text-2xl font-bold tracking-tight">Evaluation Rubrics</h1>
+                    <p className="text-[rgb(var(--color-muted))]">Create structured grading criteria for project assessments</p>
                 </div>
+                <Button variant="primary" onClick={() => setIsAddModalOpen(true)}>
+                    <Plus size={18} className="mr-2" /> Design New Rubric
+                </Button>
             </div>
 
-            <div className="flex gap-6 items-start">
-                {/* ── Batch Selection List ───────────────────────────────────── */}
-                <div className={`flex-shrink-0 transition-all duration-300 ${selectedBatch ? 'w-80' : 'w-full'}`}>
-                    <Card>
-                        <h3 className="text-xs font-bold uppercase tracking-widest text-[rgb(var(--color-muted))] mb-4 px-1">Academic Batches</h3>
-                        <div className="space-y-2">
-                            {batches.map(batch => {
-                                const isSelected = batch.id === selectedBatchId;
-                                const deadlineCount = deadlines.filter(d => d.batchId === batch.id).length;
-                                return (
-                                    <button
-                                        key={batch.id}
-                                        onClick={() => setSelectedBatchId(isSelected ? null : batch.id)}
-                                        className={`w-full text-left p-4 rounded-2xl border transition-all duration-200 group
-                                            ${isSelected 
-                                                ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/10 shadow-sm' 
-                                                : 'border-[rgb(var(--color-border))] bg-white dark:bg-gray-800 hover:border-blue-400 hover:shadow-md'
-                                            }`}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors
-                                                    ${isSelected ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 group-hover:bg-blue-50 group-hover:text-blue-500'}`}>
-                                                    <Calendar size={20} />
-                                                </div>
-                                                <div>
-                                                    <div className="font-bold text-sm">{batch.batchName}</div>
-                                                    <div className="text-[10px] text-[rgb(var(--color-muted))] mt-0.5">{batch.program} · {batch.year}</div>
-                                                </div>
-                                            </div>
-                                            <Badge variant={deadlineCount > 0 ? 'info' : 'secondary'}>{deadlineCount}</Badge>
-                                        </div>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </Card>
-                </div>
-
-                {/* ── Deadline Management Panel ──────────────────────────────── */}
-                {selectedBatch && (
-                    <div className="flex-1 animate-in fade-in slide-in-from-right-4 duration-500">
-                        <Card className="sticky top-6">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[rgb(var(--color-border))] pb-6 mb-6">
-                                <div className="flex gap-4">
-                                    <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
-                                        <Clock size={28} />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-xl font-bold">{selectedBatch.batchName}</h2>
-                                        <div className="flex items-center gap-4 mt-2">
-                                            <div className="flex items-center gap-1.5 text-xs text-[rgb(var(--color-muted))]">
-                                                <Target size={14} className="text-blue-500" />
-                                                <span className="font-bold text-[rgb(var(--color-primary))]">{totalAvailableScore}</span> Total Marks
-                                            </div>
-                                            <div className="w-1 h-1 rounded-full bg-gray-300" />
-                                            <span className="text-xs text-[rgb(var(--color-muted))] font-medium">{batchDeadlines.length} Milestones</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <Button variant="primary" size="md" onClick={() => setIsAddModalOpen(true)}>
-                                    <Plus size={18} className="mr-2" />
-                                    Add New Deadline
-                                </Button>
-                            </div>
-
-                            <div className="space-y-4">
-                                {batchDeadlines.length > 0 ? (
-                                    <div className="space-y-3">
-                                        {batchDeadlines.map((dl, idx) => (
-                                            <div key={dl.id} className="group flex items-center gap-5 p-4 rounded-2xl border border-[rgb(var(--color-border))] bg-gray-50/50 dark:bg-gray-800/20 hover:bg-white dark:hover:bg-gray-800 hover:shadow-lg transition-all border-l-4 border-l-blue-500">
-                                                <div className="flex flex-col items-center justify-center w-12 text-center border-r border-[rgb(var(--color-border))] pr-4">
-                                                    <span className="text-[10px] font-bold text-[rgb(var(--color-muted))] uppercase">M-{idx + 1}</span>
-                                                    <span className="text-sm font-black text-blue-600">{dl.maxScore}</span>
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center justify-between">
-                                                        <h4 className="font-bold text-base text-[rgb(var(--color-primary))] truncate">{dl.name}</h4>
-                                                        <span className="text-xs font-bold text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded-md flex items-center gap-1.5">
-                                                            <Calendar size={12} />
-                                                            {new Date(dl.date).toLocaleDateString()}
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-sm text-[rgb(var(--color-muted))] mt-1 line-clamp-2">{dl.description}</p>
-                                                </div>
-                                                <button 
-                                                    onClick={() => handleDelete(dl.id)}
-                                                    className="p-2 opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
-                                                >
-                                                    <Trash2 size={18} />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-24 border-2 border-dashed border-[rgb(var(--color-border))] rounded-3xl">
-                                        <div className="w-16 h-16 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300">
-                                            <Calendar size={32} />
-                                        </div>
-                                        <h3 className="font-bold text-lg mb-1">No deadlines established</h3>
-                                        <p className="text-sm text-[rgb(var(--color-muted))] max-w-xs mx-auto">Create a timeline and rubrics for students in this batch to follow.</p>
-                                        <Button variant="outline" size="sm" className="mt-6" onClick={() => setIsAddModalOpen(true)}>
-                                            Create First Deadline
-                                        </Button>
-                                    </div>
-                                )}
-                            </div>
-                        </Card>
+            {/* Batch Selector */}
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-[rgb(var(--color-border))] flex items-center justify-between shadow-sm">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center text-indigo-600">
+                        <BookOpen size={20} />
                     </div>
-                )}
+                    <div>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Active Batch Context</p>
+                        <Select 
+                            value={selectedBatch}
+                            onChange={(e) => setSelectedBatch(e.target.value)}
+                            className="h-8 border-none bg-transparent font-black text-sm p-0 focus:ring-0"
+                            disabled={batches.length === 0}
+                        >
+                            {batches.map(b => (
+                                <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                        </Select>
+                    </div>
+                </div>
+                <div className="flex items-center gap-4 text-xs text-[rgb(var(--color-muted))]">
+                   <div className="flex items-center gap-1.5 font-bold">
+                        <ListChecks size={14} className="text-indigo-500" />
+                        <span>{rubrics.length} Defined Rubrics</span>
+                   </div>
+                </div>
             </div>
 
-            {/* ── Add Deadline Modal ─────────────────────────────────────── */}
+            {isLoading ? (
+                <div className="flex justify-center py-12">
+                     <Loader2 className="animate-spin text-blue-500" size={32} />
+                </div>
+            ) : (
+                <Card className="overflow-hidden border-none shadow-xl shadow-gray-100 dark:shadow-none">
+                    {rubrics.length > 0 ? (
+                        <Table headers={headers} rows={rows} />
+                    ) : (
+                        <div className="py-20 text-center">
+                            <ClipboardCheck size={48} className="mx-auto text-gray-200 dark:text-gray-700 mb-4" />
+                            <p className="text-sm font-bold text-[rgb(var(--color-muted))] mb-4">No evaluation rubrics defined for this batch.</p>
+                            <Button variant="outline" size="sm" onClick={() => setIsAddModalOpen(true)}>Create First Rubric</Button>
+                        </div>
+                    )}
+                </Card>
+            )}
+
+            {/* Rubric Creator Modal */}
             <Modal
                 isOpen={isAddModalOpen}
                 onClose={() => setIsAddModalOpen(false)}
-                title={`Set Milestone for ${selectedBatch?.batchName}`}
+                title="Design Evaluation Rubric"
+                size="lg"
             >
-                <div className="space-y-6">
-                    <div className="flex p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                        <button
-                            onClick={() => setActiveTab('excel')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-md transition-all ${activeTab === 'excel' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500'}`}
-                        >
-                            <FileSpreadsheet size={14} />
-                            Excel Import
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('manual')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-md transition-all ${activeTab === 'manual' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500'}`}
-                        >
-                            <Edit3 size={14} />
-                            Manual Entry
-                        </button>
+                <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <Label>Rubric Title</Label>
+                            <Input 
+                                value={newRubric.name} 
+                                onChange={e => setNewRubric({...newRubric, name: e.target.value})} 
+                                placeholder="e.g. Final Presentation Assessment" 
+                            />
+                        </div>
+                        <div>
+                            <Label>Link to Milestone (Optional)</Label>
+                            <Select 
+                                value={newRubric.deadline_id} 
+                                onChange={e => setNewRubric({...newRubric, deadline_id: e.target.value})}
+                            >
+                                <option value="">Independent (No Deadline Link)</option>
+                                {deadlines.map(d => (
+                                    <option key={d.id} value={d.id}>{d.title}</option>
+                                ))}
+                            </Select>
+                        </div>
                     </div>
 
-                    {activeTab === 'excel' ? (
-                        <div className="space-y-4">
-                            <div className="p-4 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl text-[11px] leading-relaxed">
-                                <p className="font-bold text-blue-700 dark:text-blue-300 flex items-center gap-2 mb-1">
-                                    <Info size={14} />
-                                    CSV Column Order
-                                </p>
-                                <p className="text-blue-600/80 dark:text-blue-400/80">
-                                    <span className="font-bold">Name</span>, <span className="font-bold">Description</span>, <span className="font-bold">Date (YYYY-MM-DD)</span>, <span className="font-bold">MaxScore</span>
-                                </p>
-                            </div>
-                            
-                            <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-3xl cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-all group">
-                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                    <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-full mb-3 group-hover:scale-110 transition-transform text-gray-400">
-                                        <Upload size={24} />
-                                    </div>
-                                    <p className="text-sm text-[rgb(var(--color-muted))] font-bold text-center">
-                                        {importFileName || "Upload CSV Timeline"}
-                                    </p>
-                                    <p className="text-[10px] text-gray-400 mt-1 italic">Maximum file size: 2MB</p>
-                                </div>
-                                <input type="file" className="hidden" accept=".csv" onChange={handleFileChange} />
-                            </label>
-
-                            {importedRows.length > 0 && (
-                                <div className="space-y-3">
-                                    <div className="flex items-center justify-between text-xs font-bold px-1">
-                                        <span>Ready to Import ({importedRows.length})</span>
-                                        <button onClick={() => setImportedRows([])} className="text-red-500">Reset</button>
-                                    </div>
-                                    <div className="max-h-40 overflow-y-auto border border-[rgb(var(--color-border))] rounded-2xl divide-y">
-                                        {importedRows.map((row, i) => (
-                                            <div key={i} className="p-3 bg-white dark:bg-gray-900 flex justify-between items-center text-[10px]">
-                                                <div>
-                                                    <div className="font-black text-blue-600 uppercase">{row.name}</div>
-                                                    <div className="text-gray-400 mt-0.5">{row.date}</div>
-                                                </div>
-                                                <Badge variant="info">{row.score} pts</Badge>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <Button variant="primary" className="w-full py-3" onClick={handleImportConfirm}>
-                                        Import Entire Timeline
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            <div>
-                                <Label>Milestone Name</Label>
-                                <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="e.g. Design Document Submission" />
-                            </div>
-                            <div>
-                                <Label>Description</Label>
-                                <Input value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Detailed requirements for this deadline..." />
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <Label>Deadline Date</Label>
-                                    <Input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
-                                </div>
-                                <div>
-                                    <Label>Maximum Score</Label>
-                                    <Input type="number" value={formData.maxScore} onChange={e => setFormData({...formData, maxScore: parseInt(e.target.value) || 0})} placeholder="e.g. 50" />
-                                </div>
-                            </div>
-                            <Button 
-                                variant="primary" 
-                                className="w-full mt-4 py-3 shadow-lg shadow-blue-500/20" 
-                                onClick={handleAddManual} 
-                                disabled={!formData.name || !formData.date}
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-2">
+                            <h3 className="text-xs font-black uppercase tracking-widest text-indigo-600 flex items-center gap-2">
+                                <ListChecks size={14} /> Performance Criteria
+                            </h3>
+                            <button 
+                                onClick={handleAddCriterion}
+                                className="text-[10px] font-black text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded-md hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-1"
                             >
-                                Schedule Milestone
-                            </Button>
+                                <Plus size={12} /> ADD CRITERIA
+                            </button>
                         </div>
-                    )}
+
+                        <div className="space-y-3">
+                            {newRubric.criteria.map((c, index) => (
+                                <div key={index} className="flex gap-3 items-start animate-in fade-in slide-in-from-top-1 duration-200">
+                                    <div className="flex-1">
+                                        <Input 
+                                            value={c.description} 
+                                            onChange={e => handleCriterionChange(index, 'description', e.target.value)} 
+                                            placeholder="e.g. Quality of Documentation / Timeliness"
+                                            className="h-10 text-sm"
+                                        />
+                                    </div>
+                                    <div className="w-24">
+                                        <Input 
+                                            type="number" 
+                                            value={c.maxMarks} 
+                                            onChange={e => handleCriterionChange(index, 'maxMarks', parseInt(e.target.value) || 0)} 
+                                            placeholder="Marks"
+                                            className="h-10 text-sm text-center"
+                                        />
+                                    </div>
+                                    <button 
+                                        onClick={() => handleRemoveCriterion(index)}
+                                        className="p-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl transition-all"
+                                        disabled={newRubric.criteria.length === 1}
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl flex items-center justify-between border border-dashed border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-indigo-600 text-white rounded-lg">
+                                <Target size={18} />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Calculated Score</p>
+                                <p className="text-lg font-black text-indigo-600">{totalScore} Total Marks</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] text-gray-400 font-bold max-w-[150px] text-right">
+                           <AlertCircle size={12} /> Rubric will be stored as an immutable JSON template
+                        </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+                        <Button variant="outline" className="flex-1" onClick={() => setIsAddModalOpen(false)}>Cancel</Button>
+                        <Button 
+                            variant="primary" 
+                            className="flex-1" 
+                            onClick={handleSaveRubric}
+                            disabled={isSubmitting}
+                        >
+                            {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <Save size={18} className="mr-2" />} Publish Rubric
+                        </Button>
+                    </div>
                 </div>
             </Modal>
         </div>

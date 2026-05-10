@@ -53,6 +53,16 @@ export const getSubmissions = async (req: Request, res: Response) => {
     }
 };
 
+export const getFeedback = async (req: Request, res: Response) => {
+    try {
+        const data = await studentService.getStudentFeedback(req.user!.id);
+        sendSuccess(res, data);
+    } catch (error: any) {
+        logger.error('student.getFeedback error:', error.message);
+        sendError(res, error.message || 'Could not fetch feedback', 500);
+    }
+};
+
 export const submitDocument = async (req: Request, res: Response) => {
     try {
         if (!req.file) return sendError(res, 'No file uploaded', 400);
@@ -130,5 +140,79 @@ export const getGitCommits = async (req: Request, res: Response) => {
     } catch (error: any) {
         logger.error('student.getGitCommits error:', error.message);
         sendError(res, error.message || 'Could not fetch git commits', 500);
+    }
+};
+
+export const getInvitations = async (req: Request, res: Response) => {
+    try {
+        const data = await studentService.getInvitations(req.user!.id);
+        sendSuccess(res, data);
+    } catch (error: any) {
+        logger.error('student.getInvitations error:', error.message);
+        sendError(res, error.message || 'Could not fetch invitations', 500);
+    }
+};
+
+export const respondToInvitation = async (req: Request, res: Response) => {
+    try {
+        const invitationId = parseInt(req.params.id as string);
+        if (isNaN(invitationId)) return sendError(res, 'Invalid invitation id', 400);
+
+        const { accept } = req.body;
+        if (typeof accept !== 'boolean') return sendError(res, 'accept boolean is required', 400);
+
+        const data = await studentService.respondToInvitation(req.user!.id, invitationId, accept);
+        sendSuccess(res, data, accept ? 'Invitation accepted' : 'Invitation declined');
+    } catch (error: any) {
+        logger.error('student.respondToInvitation error:', error.message);
+        sendError(res, error.message || 'Could not process invitation', 500);
+    }
+};
+export const requestExtension = async (req: Request, res: Response) => {
+    try {
+        const { deadline_id, reason, requested_date } = req.body;
+        if (!deadline_id || !reason || !requested_date) {
+            return sendError(res, 'Missing required fields', 400);
+        }
+
+        const data = await studentService.createExtensionRequest(req.user!.id, {
+            deadline_id,
+            reason,
+            requested_date,
+        });
+        sendSuccess(res, data, 'Extension request submitted', 201);
+    } catch (error: any) {
+        logger.error('student.requestExtension error:', error.message);
+        sendError(res, error.message || 'Could not submit extension request', 500);
+    }
+};
+export const getDeadlines = async (req: Request, res: Response) => {
+    try {
+        const data = await studentService.getStudentDeadlines(req.user!.id);
+        sendSuccess(res, data);
+    } catch (error: any) {
+        logger.error('student.getDeadlines error:', error.message);
+        sendError(res, error.message || 'Could not fetch deadlines', 500);
+    }
+};
+
+export const getBatchMates = async (req: Request, res: Response) => {
+    try {
+        const data = await studentService.getBatchMates(req.user!.id);
+        sendSuccess(res, data);
+    } catch (error: any) {
+        console.error('student.getBatchMates error detail:', error);
+        logger.error('student.getBatchMates error:', error.message);
+        sendError(res, error.message || 'Could not fetch batch mates', 500);
+    }
+};
+
+export const getBatchSettings = async (req: Request, res: Response) => {
+    try {
+        const data = await studentService.getBatchSettings(req.user!.id);
+        sendSuccess(res, data);
+    } catch (error: any) {
+        logger.error('student.getBatchSettings error:', error.message);
+        sendError(res, error.message || 'Could not fetch batch settings', 500);
     }
 };

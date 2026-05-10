@@ -47,9 +47,19 @@ export interface ProjectGroupMeta {
   health: 'Healthy' | 'Warning' | 'At Risk';
 }
 
+export interface UpcomingDeadline {
+  id: number;
+  title: string;
+  due_date: string;
+  batch_name: string;
+  total_groups: number;
+  submitted_count: number;
+}
+
 export const guideApi = {
   // Stats & Dashboard
   getDashboardStats: () => api.get<GuideStats>('/guide/stats'),
+  getUpcomingDeadlines: () => api.get<UpcomingDeadline[]>('/guide/deadlines/upcoming'),
   
   // Batches
   getAssignedBatches: () => api.get<BatchSummary[]>('/guide/batches'),
@@ -57,6 +67,7 @@ export const guideApi = {
   
   // Topics
   getPendingTopics: () => api.get<TopicProposal[]>('/guide/topics/pending'),
+  getTopics: (status: string) => api.get<TopicProposal[]>(`/guide/topics?status=${status}`),
   approveTopic: (id: string, comments: string) => api.post(`/guide/topics/${id}/approve`, { comments }),
   rejectTopic: (id: string, reason: string) => api.post(`/guide/topics/${id}/reject`, { reason }),
   requestRevision: (id: string, instructions: string) => api.post(`/guide/topics/${id}/revision`, { instructions }),
@@ -70,6 +81,14 @@ export const guideApi = {
   reviewDocument: (docId: string, status: 'Approved' | 'Rejected', feedback: string) => 
     api.post(`/guide/documents/${docId}/review`, { status, feedback }),
     
+  // Project Completion
+  markProjectCompleted: (id: number) => api.post(`/guide/projects/${id}/complete`),
+
+  // Extension Requests
+  getExtensionRequests: () => api.get<any[]>('/guide/extensions/pending'),
+  handleExtensionRequest: (id: number, status: 'approved' | 'rejected', comment?: string) => 
+    api.post(`/guide/extensions/${id}/review`, { status, comment }),
+
   // Git Activity
   getGitActivity: () => api.get<any[]>('/guide/git-monitoring'),
   

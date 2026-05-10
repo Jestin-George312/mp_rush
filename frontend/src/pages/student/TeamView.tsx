@@ -3,19 +3,48 @@ import Card from '../../components/common/UI/Card';
 import { 
   Users, Mail, Shield,
   MessageSquare, Video,
-  Activity, Star
+  Activity, Star, Loader2
 } from 'lucide-react';
+import { studentApi } from '../../services/studentApi';
+import type { StudentProject } from '../../services/studentApi';
 
 const TeamView: React.FC = () => {
+  const [project, setProject] = React.useState<StudentProject | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const fetchProject = async () => {
+      try {
+        const res = await studentApi.getProjectDetails();
+        setProject((res.data as any).data || res.data);
+      } catch (err) {
+        console.error('Fetch team error:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchProject();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="animate-spin text-blue-500" size={32} />
+      </div>
+    );
+  }
+
   const team = {
-    name: 'AlphaTech Collective',
-    mode: 'Group Based Project',
-    guide: 'Dr. Sarah Johnson',
-    members: [
-      { name: 'Jestin George', role: 'Group Leader', email: 'jestin@univ.edu', commits: 22, tasks: 12 },
-      { name: 'Jane Smith', role: 'Collaborator', email: 'jane@univ.edu', commits: 15, tasks: 8 },
-      { name: 'Bob Wilson', role: 'Collaborator', email: 'bob@univ.edu', commits: 5, tasks: 12 },
-    ]
+    name: project?.title || 'No Project Linked',
+    mode: project?.mode || 'N/A',
+    guide: project?.guideName || 'No Guide Assigned',
+    members: (project?.members || []).map(m => ({
+      name: m.full_name,
+      role: m.is_leader ? 'Group Leader' : 'Collaborator',
+      email: m.email,
+      commits: 0,
+      tasks: 0
+    }))
   };
 
   return (
@@ -92,43 +121,7 @@ const TeamView: React.FC = () => {
             </Card>
          </div>
 
-         {/* Entity Stats */}
-         <div className="space-y-6">
-            <Card>
-               <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6">Collective Health</h3>
-               <div className="space-y-6">
-                  <div>
-                     <div className="flex justify-between items-center mb-2">
-                        <span className="text-[10px] font-black uppercase tracking-tighter">Participation Balance</span>
-                        <span className="text-[10px] font-black text-green-500">HIGH</span>
-                     </div>
-                     <div className="h-1.5 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-green-500" style={{ width: '85%' }}></div>
-                     </div>
-                  </div>
-                  <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-[10px] font-black uppercase tracking-tighter">Commits Per Member</span>
-                        <span className="text-[10px] font-black text-blue-500">14.0 avg</span>
-                     </div>
-                     <div className="h-1.5 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-600" style={{ width: '70%' }}></div>
-                     </div>
-                  </div>
-               </div>
-               <div className="mt-8 pt-8 border-t border-gray-100 dark:border-gray-700">
-                  <p className="text-[9px] text-gray-400 font-medium italic text-center">
-                    "Effective collaboration is measured by the balanced distribution of tasks and commits."
-                  </p>
-               </div>
-            </Card>
-            
-            <div className="p-6 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/20 rounded-3xl text-center">
-               <Activity size={32} className="mx-auto text-blue-600 mb-4" />
-               <h4 className="text-xs font-black uppercase tracking-widest text-gray-700 dark:text-gray-200">Activity Pulse</h4>
-               <p className="text-[10px] text-gray-400 font-bold mt-2 leading-relaxed uppercase">The collective has been active for 14 consecutive days.</p>
-            </div>
-         </div>
+         {/* Entity Stats - Removed as requested */}
       </div>
     </div>
   );

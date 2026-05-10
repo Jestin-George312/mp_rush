@@ -14,18 +14,27 @@ import {
 } from 'lucide-react';
 import * as coordApi from '../../services/coordinatorApi';
 import { toast } from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 
 const StudentManagement: React.FC = () => {
     const [search, setSearch] = useState('');
     const [batchFilter, setBatchFilter] = useState('All');
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingStudent, setEditingStudent] = useState<any | null>(null);
     const [activeTab, setActiveTab] = useState<'manual' | 'bulk'>('manual');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [students, setStudents] = useState<any[]>([]);
     const [batches, setBatches] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [newStudent, setNewStudent] = useState({ name: '', email: '', batch_id: '' });
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [newStudent, setNewStudent] = useState({ name: '', email: '', batch_id: '', password: '' });
+    
+    // Bulk state
+    const [bulkData, setBulkData] = useState<any[]>([]);
+    const [fileName, setFileName] = useState<string | null>(null);
+    const [targetBatchId, setTargetBatchId] = useState<string>('');
 
     const fetchInitialData = async () => {
         try {
@@ -52,14 +61,110 @@ const StudentManagement: React.FC = () => {
             await coordApi.createStudent({
                 name: newStudent.name,
                 email: newStudent.email,
-                batch_id: newStudent.batch_id ? parseInt(newStudent.batch_id) : undefined
+                password: newStudent.password || undefined,
+                batch_id: parseInt(batchFilter)
             });
             toast.success('Student registered successfully');
             setIsAddModalOpen(false);
-            setNewStudent({ name: '', email: '', batch_id: '' });
+            setNewStudent({ name: '', email: '', batch_id: '', password: '' });
             fetchInitialData();
         } catch (error) {
             toast.error('Failed to create student');
+        }
+    };
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setFileName(file.name);
+        const reader = new FileReader();
+        
+        reader.onload = (evt) => {
+            try {
+                const bstr = evt.target?.result;
+                const wb = XLSX.read(bstr, { type: 'binary' });
+                const wsname = wb.SheetNames[0];
+                const ws = wb.Sheets[wsname];
+                const data = XLSX.utils.sheet_to_json(ws);
+                
+                // Normalizing data based on user format or standard format
+                const normalized = data.map((row: any) => ({
+                    name: row.name || row.fullName || row.full_name || '',
+                    email: row.email || '',
+                    password: row.password || row.password_hash || 'pass123',
+                    batch_id: row.batch_id || row.batchId || null,
+                    auth_provider: row.auth_provider || row.authProvider || 'local',
+                    role: row.role || 'student'
+                }));
+
+                setBulkData(normalized);
+                toast.success(`Loaded ${normalized.length} students from ${file.name}`);
+            } catch (err) {
+                console.error('File parsing error:', err);
+                toast.error('Failed to parse file. Ensure it is a valid CSV or XLSX.');
+            }
+        };
+
+        reader.readAsBinaryString(file);
+    };
+
+    const handleStartProcessing = async () => {
+        if (bulkData.length === 0) return;
+        
+        setIsProcessing(true);
+        try {
+            // Priority: 1. Row-level batch_id from file, 2. Current page filter
+            const finalData = bulkData.map(s => ({
+                ...s,
+                batch_id: s.batch_id || parseInt(batchFilter)
+            }));
+
+            const missingBatch = finalData.find(s => !s.batch_id);
+            if (missingBatch) {
+                toast.error('No target batch selected. Please select a batch where these students should be added.');
+                setIsProcessing(false);
+                return;
+            }
+
+            await coordApi.bulkImportStudents({ students: finalData });
+            toast.success(`Successfully imported ${finalData.length} students`);
+            setIsAddModalOpen(false);
+            setBulkData([]);
+            setFileName(null);
+            setTargetBatchId('');
+            fetchInitialData();
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || 'Failed to import students');
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleUpdateStudent = async () => {
+        if (!editingStudent) return;
+        try {
+            await coordApi.updateStudent(editingStudent.uid, {
+                name: editingStudent.full_name,
+                email: editingStudent.email,
+                batch_id: editingStudent.batch_id
+            });
+            toast.success('Student updated successfully');
+            setIsEditModalOpen(false);
+            fetchInitialData();
+        } catch (error) {
+            toast.error('Failed to update student');
+        }
+    };
+
+    const handleDeleteStudent = async (id: string) => {
+        if (!window.confirm('Are you sure you want to delete this student account?')) return;
+        try {
+            await coordApi.deleteStudent(id);
+            toast.success('Student account deleted');
+            fetchInitialData();
+        } catch (error) {
+            toast.error('Failed to delete student');
         }
     };
 
@@ -102,22 +207,33 @@ const StudentManagement: React.FC = () => {
         </div>,
         <div className="flex flex-col gap-0.5 min-w-[120px]">
             {s.group_name ? (
-                <>
-                    <p className="text-[10px] text-blue-500 font-medium italic">Group: {s.group_name}</p>
-                </>
+                <p className="text-[10px] text-blue-500 font-medium italic">Group: {s.group_name}</p>
             ) : (
                 <div className="flex items-center gap-1 text-[10px] text-red-400 font-bold">
-                    <AlertTriangle size={10} /> Not Allocated
+                    <AlertTriangle size={10} /> No Group
                 </div>
             )}
+            {s.temp_guide_name && (
+                <p className="text-[10px] text-purple-600 font-bold mt-1">Temp Guide: {s.temp_guide_name}</p>
+            )}
         </div>,
-        <Badge variant={s.group_name ? 'success' : 'danger'}>
-            {s.group_name ? 'Assigned' : 'Unassigned'}
+        <Badge variant={s.group_name ? 'success' : (s.temp_guide_name ? 'warning' : 'danger')}>
+            {s.group_name ? 'Assigned' : (s.temp_guide_name ? 'Temp Assigned' : 'Unassigned')}
         </Badge>,
         <div className="flex items-center gap-2">
-            <button className="px-2.5 py-1.5 text-[10px] font-black uppercase text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/10 rounded transition-colors">Edit</button>
+            <button 
+                onClick={() => { setEditingStudent(s); setIsEditModalOpen(true); }}
+                className="px-2.5 py-1.5 text-[10px] font-black uppercase text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/10 rounded transition-colors"
+            >
+                Edit
+            </button>
             <div className="w-px h-3 bg-gray-200 dark:bg-gray-700"></div>
-            <button className="px-2.5 py-1.5 text-[10px] font-black uppercase text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 rounded transition-colors">Kick</button>
+            <button 
+                onClick={() => handleDeleteStudent(s.uid)}
+                className="px-2.5 py-1.5 text-[10px] font-black uppercase text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 rounded transition-colors"
+            >
+                Delete
+            </button>
         </div>
     ]);
 
@@ -129,12 +245,24 @@ const StudentManagement: React.FC = () => {
                     <p className="text-[rgb(var(--color-muted))]">Enrol students and manage their project lifecycle status within your department</p>
                 </div>
                 <div className="flex gap-2">
-                     <Button variant="outline" onClick={() => {setIsAddModalOpen(true); setActiveTab('bulk');}}>
-                        <Upload size={18} className="mr-2" /> Bulk Import
-                    </Button>
-                    <Button variant="primary" onClick={() => {setIsAddModalOpen(true); setActiveTab('manual');}}>
-                        <UserPlus size={18} className="mr-2" /> Register Student
-                    </Button>
+                    {batches.length === 0 ? (
+                        <div className="text-sm text-orange-500 font-bold bg-orange-50 px-3 py-1.5 rounded-lg flex items-center border border-orange-100">
+                            Create a batch first to add students
+                        </div>
+                    ) : batchFilter === 'All' ? (
+                        <div className="text-sm text-blue-500 font-bold bg-blue-50 px-3 py-1.5 rounded-lg flex items-center border border-blue-100">
+                            Select a batch to add students
+                        </div>
+                    ) : (
+                        <>
+                            <Button variant="outline" onClick={() => {setIsAddModalOpen(true); setActiveTab('bulk');}}>
+                                <Upload size={18} className="mr-2" /> Bulk Import
+                            </Button>
+                            <Button variant="primary" onClick={() => {setIsAddModalOpen(true); setActiveTab('manual');}}>
+                                <UserPlus size={18} className="mr-2" /> Register Student
+                            </Button>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -164,6 +292,29 @@ const StudentManagement: React.FC = () => {
                                 ))}
                              </Select>
                         </div>
+                        
+                        {batchFilter !== 'All' && (
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-10 text-[10px] font-black border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white"
+                                onClick={async () => {
+                                    if (!window.confirm('This will randomly distribute unassigned students to active faculty in this batch. Proceed?')) return;
+                                    try {
+                                        setIsLoading(true);
+                                        await coordApi.autoAssignTempGuides(parseInt(batchFilter));
+                                        toast.success('Temporary guides auto-assigned');
+                                        fetchInitialData();
+                                    } catch (error: any) {
+                                        toast.error(error.response?.data?.message || 'Allocation failed');
+                                        setIsLoading(false);
+                                    }
+                                }}
+                            >
+                                <Layers size={14} className="mr-2" /> Auto-assign Temp Guides
+                            </Button>
+                        )}
+
                         <div className="w-px h-6 bg-gray-200 hidden md:block"></div>
                         <div className="flex items-center gap-2">
                            <Badge variant="danger">{students.filter(s => !s.guide).length} Unassigned</Badge>
@@ -217,16 +368,11 @@ const StudentManagement: React.FC = () => {
                             </div>
                             <div>
                                 <Label>Official Email</Label>
-                                <Input type="email" value={newStudent.email} onChange={e => setNewStudent({...newStudent, email: e.target.value})} placeholder="alice.c@student.univ.edu" />
+                                <Input type="email" value={newStudent.email} onChange={e => setNewStudent({...newStudent, email: e.target.value})} placeholder="student@university.edu" />
                             </div>
                             <div>
-                                <Label>Assigned Batch</Label>
-                                <Select value={newStudent.batch_id} onChange={e => setNewStudent({...newStudent, batch_id: e.target.value})}>
-                                    <option value="">Select a batch...</option>
-                                    {batches.map(b => (
-                                        <option key={b.id} value={b.id}>{b.name}</option>
-                                    ))}
-                                </Select>
+                                <Label>Password (Optional)</Label>
+                                <Input type="password" value={newStudent.password} onChange={e => setNewStudent({...newStudent, password: e.target.value})} placeholder="Default: pass123" />
                             </div>
                             <div className="flex gap-3 pt-4 border-t border-[rgb(var(--color-border))]">
                                 <Button variant="outline" className="flex-1" onClick={() => setIsAddModalOpen(false)}>Cancel</Button>
@@ -241,31 +387,94 @@ const StudentManagement: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="font-bold text-sm">Drop your student list here</p>
-                                    <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-widest font-bold">Supports .csv, .xlsx</p>
+                                    <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-widest font-bold">Supports .xlsx, .xls</p>
                                 </div>
                                 <input 
                                     type="file" 
                                     ref={fileInputRef} 
                                     className="hidden" 
-                                    accept=".csv,.xlsx" 
-                                    onChange={(e) => console.log('File selected:', e.target.files?.[0])}
+                                    accept=".xlsx,.xls" 
+                                    onChange={handleFileUpload}
                                 />
                                 <Button variant="outline" className="mt-2" onClick={() => fileInputRef.current?.click()}>
-                                    Choose File
+                                    {fileName ? 'Change File' : 'Choose File'}
                                 </Button>
+                                {fileName && (
+                                    <div className="mt-2 flex items-center gap-2 text-xs text-green-600 font-bold bg-green-50 px-3 py-1 rounded-full">
+                                        <CheckCircle size={14} /> {fileName} ({bulkData.length} students)
+                                    </div>
+                                )}
                             </div>
+
                             <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
                                 <p className="text-[10px] font-black uppercase text-gray-400 mb-2 tracking-widest flex items-center gap-1">
-                                    <CheckCircle size={10} /> CSV Header Format
+                                    <CheckCircle size={10} /> Supported Format
                                 </p>
-                                <p className="text-[11px] font-mono text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded inline-block">
-                                    fullName, email, rollNumber, batchId
-                                </p>
+                                <div className="space-y-2">
+                                    <p className="text-[11px] font-mono text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded">
+                                        uid, name, email, password_hash
+                                    </p>
+                                    <p className="text-[10px] text-orange-500 italic">
+                                        * Note: batch_id will be automatically set to the current selected batch ({batches.find(b => b.id === parseInt(batchFilter))?.name}) unless specifically overridden in the file.
+                                    </p>
+                                </div>
                             </div>
-                            <Button variant="primary" className="w-full" disabled>Start Processing</Button>
+                            <Button 
+                                variant="primary" 
+                                className="w-full" 
+                                disabled={bulkData.length === 0 || isProcessing}
+                                onClick={handleStartProcessing}
+                            >
+                                {isProcessing ? (
+                                    <><Loader2 size={16} className="animate-spin mr-2" /> Processing...</>
+                                ) : (
+                                    `Start Processing ${bulkData.length > 0 ? `(${bulkData.length} students)` : ''}`
+                                )}
+                            </Button>
                         </div>
                     )}
                 </div>
+            </Modal>
+
+            <Modal
+                isOpen={isEditModalOpen}
+                onClose={() => setIsEditModalOpen(false)}
+                title="Edit Student Profile"
+            >
+                {editingStudent && (
+                    <div className="space-y-4">
+                        <div>
+                            <Label>Full Name</Label>
+                            <Input 
+                                value={editingStudent.full_name} 
+                                onChange={e => setEditingStudent({...editingStudent, full_name: e.target.value})} 
+                            />
+                        </div>
+                        <div>
+                            <Label>Official Email</Label>
+                            <Input 
+                                type="email"
+                                value={editingStudent.email} 
+                                onChange={e => setEditingStudent({...editingStudent, email: e.target.value})} 
+                            />
+                        </div>
+                        <div>
+                            <Label>Academic Batch</Label>
+                            <Select 
+                                value={editingStudent.batch_id} 
+                                onChange={e => setEditingStudent({...editingStudent, batch_id: parseInt(e.target.value)})}
+                            >
+                                {batches.map(b => (
+                                    <option key={b.id} value={b.id}>{b.name}</option>
+                                ))}
+                            </Select>
+                        </div>
+                        <div className="flex gap-3 pt-4 border-t border-[rgb(var(--color-border))]">
+                            <Button variant="outline" className="flex-1" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
+                            <Button variant="primary" className="flex-1" onClick={handleUpdateStudent}>Save Changes</Button>
+                        </div>
+                    </div>
+                )}
             </Modal>
         </div>
     );

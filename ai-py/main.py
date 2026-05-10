@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
     # Startup
     load_config()
     init_scheduler()
-    print(f"🤖 APMS AI Engine running on http://localhost:{settings.AI_PORT}")
+    print(f"[AI] APMS AI Engine running on http://localhost:{settings.AI_PORT}")
     yield
     # Shutdown
     stop_scheduler()

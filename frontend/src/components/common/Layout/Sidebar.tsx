@@ -23,9 +23,13 @@ import {
   Github,
   Upload,
   Trello as TrelloIcon,
-  Library
+  Library,
+  Hourglass
 } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
+import { studentApi } from '../../../services/studentApi';
+import * as coordApi from '../../../services/coordinatorApi';
+import type { StudentStats } from '../../../services/studentApi';
 
 interface NavItemProps {
   to: string;
@@ -100,7 +104,7 @@ const STUDENT_NAV: NavSection[] = [
   {
     label: 'Deliverables',
     links: [
-      { to: '/student/deadlines', label: 'Deadlines', icon: <Calendar size={18} />, badge: '2' },
+      { to: '/student/deadlines', label: 'Deadlines', icon: <Calendar size={18} /> },
       { to: '/student/submissions', label: 'Submissions', icon: <Upload size={18} /> },
       { to: '/student/feedback', label: 'Feedback', icon: <MessageSquare size={18} />, alert: true },
       { to: '/student/archive', label: 'Doc Archive', icon: <FolderOpen size={18} /> },
@@ -120,7 +124,7 @@ const GUIDE_NAV: NavSection[] = [
     label: 'Supervision Hub',
     links: [
       { to: '/guide/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-      { to: '/guide/topics', label: 'Topic Approvals', icon: <FileCheck size={18} />, badge: '4' },
+      { to: '/guide/topics', label: 'Topic Approvals', icon: <FileCheck size={18} /> },
       { to: '/guide/batches', label: 'Assigned Batches', icon: <Library size={18} /> },
     ]
   },
@@ -128,7 +132,7 @@ const GUIDE_NAV: NavSection[] = [
     label: 'Progress & Review',
     links: [
       { to: '/guide/groups', label: 'Project Groups', icon: <Users size={18} /> },
-      { to: '/guide/documents', label: 'Document Review', icon: <ClipboardList size={18} />, badge: '12' },
+      { to: '/guide/documents', label: 'Document Review', icon: <ClipboardList size={18} /> },
       { to: '/guide/kanban', label: 'Kanban Oversight', icon: <TrelloIcon size={18} /> },
     ]
   },
@@ -137,13 +141,14 @@ const GUIDE_NAV: NavSection[] = [
     links: [
       { to: '/guide/git-activity', label: 'Commit Activity', icon: <Activity size={18} /> },
       { to: '/guide/compliance', label: 'Compliance Tracker', icon: <CheckCircle size={18} />, alert: true },
+      { to: '/guide/extensions', label: 'Extensions', icon: <Hourglass size={18} /> },
     ]
   },
   {
     label: 'Communication',
     links: [
       { to: '/guide/chat', label: 'Messages', icon: <MessageSquare size={18} /> },
-      { to: '/guide/meetings', label: 'Schedule', icon: <Calendar size={18} /> },
+      // { to: '/guide/meetings', label: 'Schedule', icon: <Calendar size={18} /> },
     ]
   }
 ];
@@ -169,14 +174,15 @@ const COORDINATOR_NAV: NavSection[] = [
     links: [
       { to: '/coordinator/projects', label: 'Project Groups', icon: <FolderOpen size={18} /> },
       { to: '/coordinator/deadlines', label: 'Departmental Deadlines', icon: <Calendar size={18} /> },
-      { to: '/coordinator/submissions', label: 'Submissions', icon: <ClipboardList size={18} />, badge: '14' },
-      { to: '/coordinator/topics', label: 'Topic Approvals', icon: <CheckCircle size={18} />, badge: '5' },
+      { to: '/coordinator/submissions', label: 'Submissions', icon: <ClipboardList size={18} /> },
+      { to: '/coordinator/topics', label: 'Topic Approvals', icon: <CheckCircle size={18} /> },
     ]
   },
   {
     label: 'Audit & Health',
     links: [
       { to: '/coordinator/health', label: 'Project Health', icon: <Activity size={18} />, alert: true },
+      { to: '/coordinator/rubrics', label: 'Evaluation Rubrics', icon: <ClipboardList size={18} /> },
     ]
   }
 ];
@@ -200,6 +206,38 @@ const Sidebar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const [stats, setStats] = useState<StudentStats | null>(null);
+  const [coordinatorUnassigned, setCoordinatorUnassigned] = useState(false);
+
+  useEffect(() => {
+    if (user?.role?.toLowerCase() === 'student') {
+        const fetchStats = async () => {
+            try {
+                const res = await studentApi.getDashboardStats();
+                setStats((res.data as any).data || res.data);
+            } catch (err) {
+                console.error('Sidebar stats fetch error:', err);
+            }
+        };
+        fetchStats();
+        const interval = setInterval(fetchStats, 60000); // Refresh every minute
+        return () => clearInterval(interval);
+    } else if (user?.role?.toLowerCase() === 'coordinator') {
+        const fetchCoordStats = async () => {
+            try {
+                const res = await coordApi.getDeptStats();
+                if (res.data?.success && res.data.data.isUnassigned) {
+                    setCoordinatorUnassigned(true);
+                } else {
+                    setCoordinatorUnassigned(false);
+                }
+            } catch (err) {
+                console.error('Sidebar coord stats fetch error:', err);
+            }
+        };
+        fetchCoordStats();
+    }
+  }, [user]);
 
   // Close profile menu when clicking outside
   useEffect(() => {
@@ -229,6 +267,24 @@ const Sidebar: React.FC = () => {
 
   // Get role label for header
   const roleLabel = ROLE_LABELS[activeRole] || 'APMS';
+
+  const dynamicStudentNav = useMemo(() => {
+    if (activeRole !== 'student' || !stats) return STUDENT_NAV;
+    
+    return STUDENT_NAV.map(section => ({
+        ...section,
+        links: section.links.map(link => {
+            if (link.label === 'Repository') return { ...link, alert: !stats.hasRepo && stats.hasProject };
+            if (link.label === 'Team') return { ...link, badge: stats.memberCount > 0 ? String(stats.memberCount) : undefined };
+            if (link.label === 'Progress') return { ...link, badge: stats.progress > 0 ? `${stats.progress}%` : undefined };
+            if (link.label === 'Deadlines') return { ...link, badge: stats.pendingDeadlinesCount > 0 ? String(stats.pendingDeadlinesCount) : undefined };
+            if (link.label === 'Feedback') return { ...link, badge: stats.unreadFeedbackCount > 0 ? String(stats.unreadFeedbackCount) : undefined, alert: stats.unreadFeedbackCount > 0 };
+            if (link.label === 'Messages') return { ...link, badge: stats.unreadMessages > 0 ? String(stats.unreadMessages) : undefined };
+            if (link.label === 'Project Setup' && stats.pendingInvitationsCount > 0) return { ...link, badge: String(stats.pendingInvitationsCount), alert: true };
+            return link;
+        })
+    }));
+  }, [activeRole, stats]);
 
   const handleEditProfile = () => {
     setShowProfileMenu(false);
@@ -269,8 +325,14 @@ const Sidebar: React.FC = () => {
 
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-6 overflow-y-auto custom-scrollbar">
-        {(activeRole === 'coordinator' || activeRole === 'guide' || activeRole === 'student') ? (
-          (activeRole === 'coordinator' ? COORDINATOR_NAV : activeRole === 'guide' ? GUIDE_NAV : STUDENT_NAV).map((section) => (
+        {(activeRole === 'coordinator' && coordinatorUnassigned) ? (
+            <div className="flex flex-col items-center justify-center h-full text-center px-4 opacity-50">
+                <LayoutDashboard size={32} className="text-gray-400 mb-2" />
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Access Restricted</p>
+                <p className="text-[10px] text-gray-400 mt-1">You are not assigned to a department.</p>
+            </div>
+        ) : (activeRole === 'coordinator' || activeRole === 'guide' || activeRole === 'student') ? (
+          (activeRole === 'coordinator' ? COORDINATOR_NAV : activeRole === 'guide' ? GUIDE_NAV : dynamicStudentNav).map((section) => (
             <div key={section.label} className="space-y-1">
               {!collapsed && (
                 <p className="px-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3">

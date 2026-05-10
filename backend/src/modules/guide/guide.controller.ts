@@ -46,6 +46,17 @@ export const getPendingTopics = async (req: Request, res: Response) => {
     }
 };
 
+export const getTopics = async (req: Request, res: Response) => {
+    try {
+        const status = req.query.status || 'Pending';
+        const data = await guideService.getTopics(req.user!.id, status as string);
+        sendSuccess(res, data);
+    } catch (error: any) {
+        logger.error('guide.getTopics error:', error.message);
+        sendError(res, error.message || 'Could not fetch topics', 500);
+    }
+};
+
 export const approveTopic = async (req: Request, res: Response) => {
     try {
         const data = await guideService.reviewTopic(req.user!.id, parseInt(req.params.id as string), 'approve', req.body.comments);
@@ -99,6 +110,20 @@ export const getGroupDetails = async (req: Request, res: Response) => {
     }
 };
 
+export const markProjectCompleted = async (req: Request, res: Response) => {
+    try {
+        const guideId = req.user!.id;
+        const projectId = parseInt(req.params.id as string);
+        if (isNaN(projectId)) return sendError(res, 'Invalid project id', 400);
+
+        const project = await guideService.markProjectCompleted(guideId, projectId);
+        sendSuccess(res, project, 'Project marked as completed');
+    } catch (error: any) {
+        logger.error('markProjectCompleted error:', error.message);
+        sendError(res, error.message || 'Could not complete project', 500);
+    }
+};
+
 export const getPendingDocuments = async (req: Request, res: Response) => {
     try {
         const data = await guideService.getPendingDocuments(req.user!.id);
@@ -143,5 +168,41 @@ export const getGroupKanban = async (req: Request, res: Response) => {
     } catch (error: any) {
         logger.error('guide.getGroupKanban error:', error.message);
         sendError(res, error.message || 'Could not fetch kanban board', 500);
+    }
+};
+
+export const getUpcomingDeadlines = async (req: Request, res: Response) => {
+    try {
+        const data = await guideService.getUpcomingDeadlines(req.user!.id);
+        sendSuccess(res, data);
+    } catch (error: any) {
+        logger.error('guide.getUpcomingDeadlines error:', error.message);
+        sendError(res, error.message || 'Could not fetch upcoming deadlines', 500);
+    }
+};
+export const getExtensionRequests = async (req: Request, res: Response) => {
+    try {
+        const data = await guideService.getExtensionRequests(req.user!.id);
+        sendSuccess(res, data);
+    } catch (error: any) {
+        logger.error('guide.getExtensionRequests error:', error.message);
+        sendError(res, error.message || 'Could not fetch extension requests', 500);
+    }
+};
+
+export const handleExtensionRequest = async (req: Request, res: Response) => {
+    try {
+        const requestId = parseInt(req.params.id as string);
+        const { status } = req.body;
+        if (isNaN(requestId)) return sendError(res, 'Invalid request id', 400);
+        if (!['approved', 'rejected'].includes(status)) {
+            return sendError(res, 'Status must be approved or rejected', 400);
+        }
+
+        const data = await guideService.reviewExtensionRequest(req.user!.id, requestId, status);
+        sendSuccess(res, data, `Extension request ${status}`);
+    } catch (error: any) {
+        logger.error('guide.handleExtensionRequest error:', error.message);
+        sendError(res, error.message || 'Could not process extension request', 500);
     }
 };

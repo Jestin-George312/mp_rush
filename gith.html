@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Git Visualizer</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: #111;
+            color: #fff;
+            text-align: center;
+        }
+
+        input {
+            width: 400px;
+            padding: 10px;
+            margin: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+
+        .timeline {
+            position: relative;
+            margin: 50px auto;
+            width: 400px;
+        }
+
+        .line {
+            position: absolute;
+            left: 50%;
+            width: 2px;
+            background: #555;
+            top: 0;
+            bottom: 0;
+        }
+
+        .commit {
+            position: relative;
+            margin: 30px 0;
+            text-align: left;
+            padding-left: 60px;
+        }
+
+        .dot {
+            position: absolute;
+            left: calc(50% - 6px);
+            width: 12px;
+            height: 12px;
+            background: lime;
+            border-radius: 50%;
+        }
+
+        .card {
+            background: #222;
+            padding: 10px;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Git Visualize</h2>
+
+<input type="text" id="repoInput" placeholder="https://github.com/user/repo">
+<br>
+<button onclick="loadCommits()">Visualize</button>
+
+<div class="timeline" id="timeline">
+    <div class="line"></div>
+</div>
+
+<script>
+function loadCommits() {
+    const url = document.getElementById("repoInput").value.trim();
+
+    try {
+        const repoPath = url.split("github.com/")[1].replace(/\/$/, "");
+        const [owner, repo] = repoPath.split("/");
+
+        if (!owner || !repo) throw "Invalid repo";
+
+        const apiUrl = `https://api.github.com/repos/${owner}/${repo}/commits`;
+
+        fetch(apiUrl)
+            .then(async res => {
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw err.message;
+                }
+                return res.json();
+            })
+            .then(data => drawCommits(data))
+            .catch(err => {
+                console.error(err);
+                alert("GitHub API Error: " + err);
+            });
+
+    } catch (e) {
+        alert("Invalid GitHub URL");
+    }
+}
+
+function drawCommits(commits) {
+    const timeline = document.getElementById("timeline");
+    timeline.innerHTML = '<div class="line"></div>';
+
+    commits.slice(0, 15).forEach(commit => {
+        const div = document.createElement("div");
+        div.className = "commit";
+
+        div.innerHTML = `
+            <div class="dot"></div>
+            <div class="card">
+                <strong>${commit.commit.author.name}</strong><br>
+                ${commit.commit.message}<br>
+                <small>${new Date(commit.commit.author.date).toLocaleString()}</small>
+            </div>
+        `;
+
+        timeline.appendChild(div);
+    });
+}
+</script>
+</body>
+</html>

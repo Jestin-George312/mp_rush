@@ -1,5 +1,22 @@
 import pool from '../../config/db';
 
+// ── Helper: auto-recalculate project progress from tasks ──────
+const recalculateProgress = async (projectId: number) => {
+    const result = await pool.query(
+        `SELECT COUNT(*)::int AS total,
+                COUNT(*) FILTER (WHERE status = 'done')::int AS done
+         FROM tasks WHERE project_id = $1`,
+        [projectId]
+    );
+    const { total, done } = result.rows[0];
+    const progress = total === 0 ? 0 : Math.round((done / total) * 100);
+    await pool.query(
+        `UPDATE projects SET progress = $1, updated_at = NOW() WHERE id = $2`,
+        [progress, projectId]
+    );
+    return progress;
+};
+
 // ────────────────────────────────────────────────────────────
 // GET /api/tasks?projectId=  — fetch tasks for a project
 // ────────────────────────────────────────────────────────────
@@ -62,7 +79,11 @@ export const updateTaskStatus = async (
         [status, taskId]
     );
     if (result.rows.length === 0) throw new Error('Task not found');
-    return result.rows[0];
+
+    // Auto-recalculate project progress
+    const task = result.rows[0];
+    const progress = await recalculateProgress(task.project_id);
+    return { ...task, project_progress: progress };
 };
 
 // ────────────────────────────────────────────────────────────
@@ -90,10 +111,14 @@ export const updateTask = async (
 // DELETE /api/tasks/:id
 // ────────────────────────────────────────────────────────────
 export const deleteTask = async (taskId: number) => {
-    const result = await pool.query(
-        `DELETE FROM tasks WHERE id = $1 RETURNING id`,
-        [taskId]
-    );
-    if (result.rows.length === 0) throw new Error('Task not found');
+    // Get project_id before deleting
+    const taskRes = await pool.query(`SELECT project_id FROM tasks WHERE id = $1`, [taskId]);
+    if (taskRes.rows.length === 0) throw new Error('Task not found');
+    const projectId = taskRes.rows[0].project_id;
+
+    await pool.query(`DELETE FROM tasks WHERE id = $1`, [taskId]);
+
+    // Recalculate after deletion
+    await recalculateProgress(projectId);
     return { deleted: true, id: taskId };
 };

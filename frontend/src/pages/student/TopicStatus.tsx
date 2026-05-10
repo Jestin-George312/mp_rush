@@ -5,18 +5,54 @@ import {
   FileCheck, Clock, CheckCircle2, 
   AlertCircle, Info 
 } from 'lucide-react';
+import { studentApi } from '../../services/studentApi';
 
 const TopicStatus: React.FC = () => {
-  // High fidelity mock for topic status
+  const [loading, setLoading] = React.useState(true);
+  const [project, setProject] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    const fetchProject = async () => {
+      try {
+        const res = await studentApi.getProjectDetails();
+        // Correctly handle the standardized response { success, data, message }
+        setProject(res.data.data);
+      } catch (err) {
+        console.error('Fetch project error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProject();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <div className="text-center py-20">
+        <h2 className="text-xl font-bold text-gray-500">No project initialized yet.</h2>
+        <p className="text-gray-400 mt-2">Go to Project Setup to start your project journey.</p>
+      </div>
+    );
+  }
+
   const topicData = {
-    title: 'Smart Health Monitoring System',
-    status: 'In Review',
-    submittedAt: '2026-04-15 10:20',
-    guideComments: 'Waiting for Department Head validation.',
+    title: project.title,
+    status: project.status,
+    submittedAt: new Date(project.created_at || new Date()).toLocaleString(),
+    guideComments: project.topic_feedback || 'Waiting for initial review.',
+    guideName: project.guideName || 'Not Assigned',
     history: [
-       { date: '2026-04-15', event: 'Proposal Submitted', status: 'Pending' },
-       { date: '2026-04-16', event: 'Assigned to Dr. Sarah Johnson', status: 'Guide Assigned' },
-       { date: '2026-04-17', event: 'Initial Feasibility Check', status: 'In Review' },
+       { date: new Date(project.created_at).toLocaleDateString(), event: 'Proposal Submitted', status: 'Pending' },
+       ...(project.guideName ? [{ date: new Date(project.created_at).toLocaleDateString(), event: `Assigned to ${project.guideName}`, status: 'Guide Assigned' }] : []),
+       { date: project.topic_reviewed_at ? new Date(project.topic_reviewed_at).toLocaleDateString() : '...', event: 'Current Status', status: project.status },
     ]
   };
 
@@ -36,7 +72,7 @@ const TopicStatus: React.FC = () => {
                <div className="flex flex-col md:flex-row justify-between gap-6">
                   <div className="space-y-4">
                      <div>
-                        <Badge variant="secondary" className="px-3 py-1 font-black mb-3">CURRENT STAGE: {topicData.status.toUpperCase()}</Badge>
+                        <Badge variant="secondary" className="px-3 py-1 font-black mb-3">CURRENT STAGE: {(topicData.status || 'PENDING').toUpperCase()}</Badge>
                         <h2 className="text-xl font-black">{topicData.title}</h2>
                      </div>
                      <div className="flex items-center gap-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">
@@ -89,8 +125,10 @@ const TopicStatus: React.FC = () => {
                <div className="mt-8 pt-8 border-t border-white/10 flex items-center justify-between">
                   <span className="text-[10px] font-black uppercase opacity-60">Verified Authority</span>
                   <div className="flex items-center gap-2">
-                     <span className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center text-[10px] font-black">SJ</span>
-                     <span className="text-xs font-bold">Dr. Sarah Johnson</span>
+                     <span className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center text-[10px] font-black">
+                        {(topicData.guideName || 'NA').split(' ').map((n: string) => n[0]).join('').toUpperCase()}
+                     </span>
+                     <span className="text-xs font-bold">{topicData.guideName}</span>
                   </div>
                </div>
             </Card>

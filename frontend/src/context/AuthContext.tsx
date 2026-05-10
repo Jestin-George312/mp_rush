@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { User, Role } from '../types';
 import * as authApi from '../services/authApi';
+import { AuthContext } from '../hooks/useAuth';
 
 // Role to dashboard path mapping
 const ROLE_DASHBOARDS: Record<string, string> = {
@@ -31,16 +32,6 @@ const mapLoginUser = (loginUser: authApi.LoginResponse['user']): User => ({
     picture: loginUser.picture || undefined,
 });
 
-interface AuthContextType {
-    user: User | null;
-    loginWithGoogle: (credential: string) => Promise<void>;
-    loginWithCredentials: (email: string, password: string) => Promise<void>;
-    register: (payload: authApi.RegisterPayload) => Promise<void>;
-    logout: () => void;
-    isLoading: boolean;
-}
-
-export const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);

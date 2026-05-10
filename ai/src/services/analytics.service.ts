@@ -24,7 +24,7 @@ export const getGuideEffectiveness = async (deptId?: number) => {
         LEFT JOIN projects p ON p.group_id = g.id
         LEFT JOIN tasks t ON t.project_id = p.id
         LEFT JOIN documents doc ON doc.project_id = p.id
-        WHERE u.role = 'guide' AND u.is_deleted = FALSE ${filter}
+        WHERE u.role = 'guide'  ${filter}
         GROUP BY u.uid, pr.full_name
         ORDER BY AVG(p.progress) DESC NULLS LAST
     `, params);
@@ -105,7 +105,7 @@ export const getWorkloadFairness = async () => {
     const res = await pool.query(`
         SELECT u.uid AS guide_id, pr.full_name, COUNT(g.id)::int AS load
         FROM users u LEFT JOIN profiles pr ON pr.u_id = u.uid LEFT JOIN groups g ON g.guide_id = u.uid
-        WHERE u.role='guide' AND u.is_deleted=FALSE
+        WHERE u.role='guide' 
         GROUP BY u.uid, pr.full_name ORDER BY load DESC
     `);
     const loads = res.rows.map((r: any) => r.load);

@@ -11,9 +11,13 @@ const pool = new Pool({
     port: parseInt(process.env.DB_PORT || '5432'),
 });
 
-// Test the connection on startup
-pool.on('connect', () => {
-    console.log('📦 Connected to PostgreSQL database');
+// Test connection once
+pool.query('SELECT NOW()', (err) => {
+    if (err) {
+        console.error('❌ Database connection failed:', err.message);
+    } else {
+        console.log('📦 Connected to PostgreSQL database');
+    }
 });
 
 pool.on('error', (err) => {

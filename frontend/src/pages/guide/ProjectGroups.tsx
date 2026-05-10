@@ -5,49 +5,35 @@ import {
   Filter, ChevronRight, Activity,
   CheckCircle2, AlertCircle
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import Badge from '../../components/common/UI/Badge';
 import Input from '../../components/common/UI/Input';
+import { guideApi, type ProjectGroupMeta } from '../../services/guideApi';
 
 const ProjectGroups: React.FC = () => {
   const navigate = useNavigate();
+  const { batchId } = useParams<{ batchId: string }>();
   const [search, setSearch] = useState('');
+  const [groups, setGroups] = useState<ProjectGroupMeta[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const groups = [
-    {
-      id: 'g1',
-      name: 'AlphaTech',
-      title: 'Smart Health Monitoring System',
-      batch: 'MCA 2024-26 A',
-      members: ['Alice', 'Bob', 'Charlie'],
-      repo: 'github.com/alphatech/shm',
-      lastCommit: 'Merge pull request #12 (2h ago)',
-      status: 'Approved',
-      health: 'Healthy'
-    },
-    {
-      id: 'g2',
-      name: 'EcoNexus',
-      title: 'Waste Management Optimization',
-      batch: 'MCA 2024-26 B',
-      members: ['Dave', 'Eve'],
-      repo: 'github.com/econexus/waste-opt',
-      lastCommit: 'Fix styling issues (1d ago)',
-      status: 'In Progress',
-      health: 'Warning'
-    },
-    {
-      id: 'g3',
-      name: 'Sentinel',
-      title: 'Real-time Fraud Detection',
-      batch: 'MCA 2024-26 A',
-      members: ['Frank', 'Grace', 'Heidi'],
-      repo: null,
-      lastCommit: null,
-      status: 'Pending Topic',
-      health: 'At Risk'
-    }
-  ];
+  React.useEffect(() => {
+    const fetchGroups = async () => {
+      try {
+        setLoading(true);
+        const res = batchId 
+          ? await guideApi.getBatchGroups(batchId)
+          : await guideApi.getSupervisedGroups();
+        const data = (res.data as any).data || res.data;
+        setGroups(data);
+      } catch (err) {
+        console.error('Error fetching supervised groups:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchGroups();
+  }, [batchId]);
 
   return (
     <div className="space-y-6">
@@ -86,7 +72,7 @@ const ProjectGroups: React.FC = () => {
             >
                <div className="flex-1 space-y-3">
                   <div className="flex items-center gap-3">
-                     <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded uppercase tracking-widest">{group.batch}</span>
+                     <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded uppercase tracking-widest">{group.batchName}</span>
                      <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-black uppercase ${
                        group.health === 'Healthy' ? 'bg-green-50 text-green-600' : 
                        group.health === 'Warning' ? 'bg-orange-50 text-orange-600' : 'bg-red-50 text-red-600'
@@ -100,17 +86,17 @@ const ProjectGroups: React.FC = () => {
                   
                   <div className="flex flex-wrap items-center gap-6">
                      <div className="flex items-center gap-2 text-[11px] font-bold text-gray-500">
-                        <Users size={14} className="text-gray-400" /> {group.members.join(', ')}
+                        <Users size={14} className="text-gray-400" /> {group.members?.join(', ') || 'No members'}
                      </div>
                      <div className="flex items-center gap-2 text-[11px] font-bold text-gray-400">
-                        <Github size={14} /> {group.repo ? group.repo.replace('github.com/', '') : 'Not Connected'}
+                        <Github size={14} /> {group.repoUrl ? group.repoUrl.replace('github.com/', '') : 'Not Connected'}
                      </div>
                   </div>
 
                   {group.lastCommit && (
                     <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded-lg flex items-center gap-2 text-[10px] font-medium text-gray-400 border border-gray-100 dark:border-gray-700">
                       <Activity size={12} className="text-blue-500" />
-                      <span className="font-bold text-gray-600 dark:text-gray-300">Activity:</span> {group.lastCommit}
+                      <span className="font-bold text-gray-600 dark:text-gray-300">Activity:</span> {typeof group.lastCommit === 'string' ? group.lastCommit : group.lastCommit.message}
                     </div>
                   )}
                </div>

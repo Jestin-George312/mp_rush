@@ -38,9 +38,9 @@ def load_config():
         rows = query("SELECT key, value FROM ai_config")
         for row in rows:
             _config_cache[row["key"]] = row["value"] if isinstance(row["value"], dict) else json.loads(row["value"])
-        print("🤖 AI config loaded from database")
+        print("[AI] Config loaded from database")
     except Exception:
-        print("⚠️  ai_config table not found, using defaults")
+        print("[AI] ai_config table not found, using defaults")
 
 
 def get_risk_thresholds() -> dict:

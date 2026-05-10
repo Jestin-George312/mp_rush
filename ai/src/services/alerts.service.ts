@@ -194,7 +194,7 @@ export const generateCoordinatorAlerts = async (): Promise<number> => {
     const coordRes = await pool.query(`
         SELECT u.uid, d.id AS dept_id FROM users u
         JOIN departments d ON d.coordinator_id = u.uid
-        WHERE u.role = 'coordinator' AND u.is_deleted = FALSE
+        WHERE u.role = 'coordinator' 
     `);
 
     for (const coord of coordRes.rows) {
@@ -225,7 +225,7 @@ export const generateCoordinatorAlerts = async (): Promise<number> => {
             FROM users u
             LEFT JOIN profiles p ON p.u_id = u.uid
             LEFT JOIN groups g ON g.guide_id = u.uid
-            WHERE u.role = 'guide' AND u.is_deleted = FALSE
+            WHERE u.role = 'guide' 
             GROUP BY u.uid, p.full_name
             HAVING COUNT(g.id) >= 8
         `);

@@ -2,7 +2,9 @@ import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import http from 'http';
 import pool from './config/db';
+import { initSocket } from './socket';
 
 // Import Routes
 import authRoutes from './modules/auth/auth.routes';
@@ -18,6 +20,8 @@ import adminRoutes from './modules/admin/admin.routes';
 import studentRoutes from './modules/student/student.routes';
 import guideRoutes from './modules/guide/guide.routes';
 import coordinatorRoutes from './modules/coordinator/coordinator.routes';
+import extensionRoutes from './modules/extensions/extension.routes';
+import notificationRoutes from './modules/notifications/notification.routes';
 
 // Import Utilities
 import { errorHandler } from './middleware/error.middleware';
@@ -27,7 +31,11 @@ import { UPLOAD_DIR, UPLOAD_URL_PREFIX } from './config/storage';
 dotenv.config();
 
 const app: Application = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
+
+// Initialize Socket.io
+initSocket(server);
 
 // Global Middleware
 app.use(cors({
@@ -53,6 +61,8 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/student', studentRoutes);
 app.use('/api/guide', guideRoutes);
 app.use('/api/coordinator', coordinatorRoutes);
+app.use('/api/extensions', extensionRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Basic Health Check Route (Checks Express AND Postgres)
 app.get('/health', async (req: Request, res: Response) => {
@@ -76,9 +86,9 @@ app.use(errorHandler);
 
 // Start the server only if not in test mode
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`🚀 APMS Server running on http://localhost:${PORT}`);
   });
 }
 
-export default app;
+export default server;

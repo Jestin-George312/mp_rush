@@ -35,7 +35,7 @@ export const getSuggestedAllocations = async (batchId: number): Promise<Allocati
         FROM users u
         LEFT JOIN profiles pr ON pr.u_id = u.uid
         LEFT JOIN groups g ON g.guide_id = u.uid
-        WHERE u.role = 'guide' AND u.is_deleted = FALSE
+        WHERE u.role = 'guide' 
         GROUP BY u.uid, pr.full_name, pr.bio
         HAVING COUNT(g.id) < $1
         ORDER BY COUNT(g.id) ASC
@@ -167,7 +167,7 @@ export const getWorkloadDistribution = async () => {
         FROM users u
         LEFT JOIN profiles pr ON pr.u_id = u.uid
         LEFT JOIN groups g ON g.guide_id = u.uid
-        WHERE u.role = 'guide' AND u.is_deleted = FALSE
+        WHERE u.role = 'guide' 
         GROUP BY u.uid, pr.full_name
         ORDER BY current_load DESC
     `, [getMaxGuideLoad().hard_cap]);

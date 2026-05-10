@@ -23,7 +23,7 @@ export const getUserProfile = async (userId: number) => {
             p.location
         FROM users u
         LEFT JOIN profiles p ON u.uid = p.u_id
-        WHERE u.uid = $1 AND u.is_deleted = FALSE
+        WHERE u.uid = $1 
     `;
     const result = await pool.query(query, [userId]);
     if (result.rows.length === 0) throw new Error('User not found');

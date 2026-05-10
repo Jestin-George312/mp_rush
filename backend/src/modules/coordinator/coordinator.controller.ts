@@ -13,9 +13,9 @@ export const getStats = async (req: Request, res: Response) => {
     }
 };
 
-export const getFaculty = async (_req: Request, res: Response) => {
+export const getFaculty = async (req: Request, res: Response) => {
     try {
-        const data = await coordinatorService.getFaculty();
+        const data = await coordinatorService.getFaculty(req.user!.id);
         sendSuccess(res, data);
     } catch (error: any) {
         logger.error('coordinator.getFaculty error:', error.message);
@@ -30,6 +30,17 @@ export const createFaculty = async (req: Request, res: Response) => {
     } catch (error: any) {
         logger.error('coordinator.createFaculty error:', error.message);
         sendError(res, error.message || 'Could not create faculty', 500);
+    }
+};
+
+export const importFaculty = async (req: Request, res: Response) => {
+    try {
+        const faculty = Array.isArray(req.body?.faculty) ? req.body.faculty : req.body;
+        const data = await coordinatorService.importFaculty(faculty);
+        sendSuccess(res, data, 'Faculty imported', 201);
+    } catch (error: any) {
+        logger.error('coordinator.importFaculty error:', error.message);
+        sendError(res, error.message || 'Could not import faculty', 500);
     }
 };
 
@@ -65,6 +76,18 @@ export const createBatch = async (req: Request, res: Response) => {
     }
 };
 
+export const updateBatch = async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(req.params.id as string);
+        if (isNaN(id)) return sendError(res, 'Invalid batch id', 400);
+        const data = await coordinatorService.updateBatch(id, req.body);
+        sendSuccess(res, data, 'Batch updated');
+    } catch (error: any) {
+        logger.error('coordinator.updateBatch error:', error.message);
+        sendError(res, error.message || 'Could not update batch', 500);
+    }
+};
+
 export const getStudents = async (req: Request, res: Response) => {
     try {
         const batchId = req.query.batchId ? parseInt(req.query.batchId as string) : undefined;
@@ -86,6 +109,28 @@ export const createStudent = async (req: Request, res: Response) => {
     }
 };
 
+export const updateStudent = async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(req.params.id as string);
+        const data = await coordinatorService.updateStudent(id, req.body);
+        sendSuccess(res, data, 'Student updated');
+    } catch (error: any) {
+        logger.error('coordinator.updateStudent error:', error.message);
+        sendError(res, error.message || 'Could not update student', 500);
+    }
+};
+
+export const deleteStudent = async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(req.params.id as string);
+        await coordinatorService.deleteStudent(id);
+        sendSuccess(res, null, 'Student deleted');
+    } catch (error: any) {
+        logger.error('coordinator.deleteStudent error:', error.message);
+        sendError(res, error.message || 'Could not delete student', 500);
+    }
+};
+
 export const importStudents = async (req: Request, res: Response) => {
     try {
         const students = Array.isArray(req.body?.students) ? req.body.students : req.body;
@@ -97,11 +142,36 @@ export const importStudents = async (req: Request, res: Response) => {
     }
 };
 
+export const getBatchFaculty = async (req: Request, res: Response) => {
+    try {
+        const batchId = parseInt(req.params.batchId as string);
+        if (isNaN(batchId)) return sendError(res, 'Invalid batch id', 400);
+        const data = await coordinatorService.getBatchFaculty(batchId);
+        sendSuccess(res, data);
+    } catch (error: any) {
+        logger.error('coordinator.getBatchFaculty error:', error.message);
+        sendError(res, error.message || 'Could not fetch batch faculty', 500);
+    }
+};
+
+export const setBatchFaculty = async (req: Request, res: Response) => {
+    try {
+        const batchId = parseInt(req.params.batchId as string);
+        if (isNaN(batchId)) return sendError(res, 'Invalid batch id', 400);
+        const facultyIds = req.body.facultyIds; // Array of uids
+        const data = await coordinatorService.setBatchFaculty(batchId, facultyIds);
+        sendSuccess(res, data, 'Batch faculty updated');
+    } catch (error: any) {
+        logger.error('coordinator.setBatchFaculty error:', error.message);
+        sendError(res, error.message || 'Could not set batch faculty', 500);
+    }
+};
+
 export const getGuideAllocations = async (req: Request, res: Response) => {
     try {
         const batchId = parseInt(req.params.batchId as string);
         if (isNaN(batchId)) return sendError(res, 'Invalid batch id', 400);
-        const data = await coordinatorService.getGuideAllocations(batchId);
+        const data = await coordinatorService.getGuideAllocations(req.user!.id, batchId);
         sendSuccess(res, data);
     } catch (error: any) {
         logger.error('coordinator.getGuideAllocations error:', error.message);
@@ -117,6 +187,28 @@ export const assignGuide = async (req: Request, res: Response) => {
     } catch (error: any) {
         logger.error('coordinator.assignGuide error:', error.message);
         sendError(res, error.message || 'Could not assign guide', 500);
+    }
+};
+
+export const assignTempGuide = async (req: Request, res: Response) => {
+    try {
+        const { studentId, guideId } = req.body;
+        const data = await coordinatorService.assignTempGuide(parseInt(studentId), parseInt(guideId));
+        sendSuccess(res, data, 'Temporary guide assigned');
+    } catch (error: any) {
+        logger.error('coordinator.assignTempGuide error:', error.message);
+        sendError(res, error.message || 'Could not assign temporary guide', 500);
+    }
+};
+
+export const autoAssignTempGuides = async (req: Request, res: Response) => {
+    try {
+        const { batchId } = req.body;
+        const data = await coordinatorService.autoAssignTempGuides(parseInt(batchId));
+        sendSuccess(res, data, 'Temporary guides auto-assigned');
+    } catch (error: any) {
+        logger.error('coordinator.autoAssignTempGuides error:', error.message);
+        sendError(res, error.message || 'Could not auto-assign temporary guides', 500);
     }
 };
 
@@ -204,5 +296,17 @@ export const getProjectHealth = async (req: Request, res: Response) => {
     } catch (error: any) {
         logger.error('coordinator.getProjectHealth error:', error.message);
         sendError(res, error.message || 'Could not fetch project health', 500);
+    }
+};
+
+export const closeBatch = async (req: Request, res: Response) => {
+    try {
+        const batchId = parseInt(req.params.batchId as string);
+        if (isNaN(batchId)) return sendError(res, 'Invalid batch id', 400);
+        const data = await coordinatorService.closeBatch(req.user!.id, batchId);
+        sendSuccess(res, data, 'Batch closed and projects archived');
+    } catch (error: any) {
+        logger.error('coordinator.closeBatch error:', error.message);
+        sendError(res, error.message || 'Could not close batch', 500);
     }
 };

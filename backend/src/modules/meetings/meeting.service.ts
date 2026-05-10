@@ -14,10 +14,10 @@ export const createMeeting = async (
         group_id?: number | null;
     }
 ) => {
-    // Basic meeting request (status defaults to 'upcoming')
+    // Basic meeting request (status defaults to 'requested')
     const result = await pool.query(
         `INSERT INTO meetings (project_id, group_id, requested_by, title, date, time, agenda, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'upcoming')
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'requested')
          RETURNING *`,
         [data.project_id || null, data.group_id || null, requesterId, data.title, data.date, data.time, data.agenda]
     );
@@ -74,11 +74,12 @@ export const getUserMeetings = async (userId: number, role: string) => {
 export const updateMeeting = async (
     meetingId: number,
     data: {
-        status?: 'upcoming' | 'completed' | 'cancelled';
+        status?: 'requested' | 'upcoming' | 'completed' | 'cancelled';
         meet_link?: string;
         date?: string;
         time?: string;
         duration?: string;
+        minutes?: string;
     }
 ) => {
     const result = await pool.query(
@@ -88,10 +89,11 @@ export const updateMeeting = async (
             meet_link = COALESCE($2, meet_link),
             date = COALESCE($3::date, date),
             time = COALESCE($4, time),
-            duration = COALESCE($5, duration)
-         WHERE id = $6
+            duration = COALESCE($5, duration),
+            minutes = COALESCE($6, minutes)
+         WHERE id = $7
          RETURNING *`,
-        [data.status ?? null, data.meet_link ?? null, data.date ?? null, data.time ?? null, data.duration ?? null, meetingId]
+        [data.status ?? null, data.meet_link ?? null, data.date ?? null, data.time ?? null, data.duration ?? null, data.minutes ?? null, meetingId]
     );
 
     if (result.rows.length === 0) throw new Error('Meeting not found');

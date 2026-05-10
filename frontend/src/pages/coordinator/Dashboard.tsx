@@ -40,6 +40,28 @@ const CoordinatorDashboard: React.FC = () => {
 
     if (!data) return null;
 
+    // Handle unassigned coordinator
+    if (data.isUnassigned) {
+        return (
+            <div className="h-[60vh] flex flex-col items-center justify-center gap-6">
+                <div className="text-center space-y-4">
+                    <AlertCircle size={64} className="mx-auto text-orange-500" />
+                    <div>
+                        <h1 className="text-3xl font-bold text-[rgb(var(--color-text))]">Unassigned Coordinator</h1>
+                        <p className="text-[rgb(var(--color-muted))] mt-2 max-w-md mx-auto">
+                            You are currently not assigned to any department. Please contact the administrator to assign you to a department and regain access to the dashboard.
+                        </p>
+                    </div>
+                    <div className="pt-4">
+                        <button className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors">
+                            Contact Administrator
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     const { stats, deadlines, faculty } = data;
 
     return (

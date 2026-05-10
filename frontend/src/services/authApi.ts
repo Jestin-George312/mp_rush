@@ -88,6 +88,11 @@ export const getCurrentUser = async (): Promise<BackendUser> => {
 /**
  * Clear the stored token to log the user out.
  */
-export const logout = () => {
+export const logout = async () => {
+    try {
+        await api.post('/auth/logout');
+    } catch (e) {
+        console.error('Logout error:', e);
+    }
     localStorage.removeItem('token');
 };

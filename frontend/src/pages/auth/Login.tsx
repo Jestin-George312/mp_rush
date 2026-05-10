@@ -122,7 +122,8 @@ const Login: React.FC = () => {
             </button>
           </form>
 
-          {/* Divider */}
+          {/* Divider - Disabled for now */}
+          {/* 
           <div className="relative py-5 flex items-center justify-center">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t border-[rgb(var(--color-border))]"></span>
@@ -132,7 +133,6 @@ const Login: React.FC = () => {
             </span>
           </div>
 
-          {/* Google Sign-In */}
           <div className="flex justify-center">
             <GoogleLogin
               onSuccess={async (credentialResponse) => {
@@ -155,6 +155,7 @@ const Login: React.FC = () => {
               shape="rectangular"
             />
           </div>
+          */}
 
           <p className="mt-6 text-center text-sm text-[rgb(var(--color-muted))]">
             Don't have an account?{' '}

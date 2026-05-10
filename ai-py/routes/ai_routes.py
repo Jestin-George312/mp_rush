@@ -7,6 +7,7 @@ from typing import Optional
 
 from services import risk_service, alerts_service, allocation_service
 from services import monitoring_service, approval_service, analytics_service
+from services import plagiarism_service
 from scheduler.cron import trigger_job
 from config.settings import get_all_config, update_config
 from config.database import query
@@ -179,10 +180,18 @@ def get_config():
     return get_all_config()
 
 
-@router.patch("/config/{key}", summary="Update config key")
-def update_config_endpoint(key: str, value: dict):
+@router.post("/config/update", summary="Update system configuration")
+def post_update_config(key: str = Query(...), value: str = Query(...)):
     update_config(key, value)
-    return {"success": True}
+    return {"success": True, "key": key, "value": value}
+
+
+# ══════════════════════════════════════════════════════════
+#  F8 — PLAGIARISM
+# ══════════════════════════════════════════════════════════
+@router.get("/plagiarism/check/{doc_id}", summary="Check document for plagiarism")
+def run_plagiarism_check(doc_id: int, threshold: int = Query(70)):
+    return plagiarism_service.check_plagiarism(doc_id, threshold)
 
 
 @router.get("/audit-log", summary="View AI audit log")

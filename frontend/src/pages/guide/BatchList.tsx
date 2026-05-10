@@ -4,45 +4,27 @@ import {
   Users, Library, FileText, ChevronRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { guideApi } from '../../services/guideApi';
 
 const BatchList: React.FC = () => {
   const navigate = useNavigate();
+  const [supervisedBatches, setSupervisedBatches] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
 
-  const supervisedBatches = [
-    { 
-      id: 'b1', 
-      name: 'MCA 2024-26 Batch A', 
-      year: '2024-2026',
-      mode: 'Full-Scale Project',
-      groupCount: 8, 
-      studentCount: 24,
-      progress: 65, 
-      pendingReviews: 3,
-      status: 'Active'
-    },
-    { 
-      id: 'b2', 
-      name: 'MCA 2024-26 Batch B', 
-      year: '2024-2026',
-      mode: 'Full-Scale Project',
-      groupCount: 6, 
-      studentCount: 18,
-      progress: 40, 
-      pendingReviews: 5,
-      status: 'Active'
-    },
-    { 
-      id: 'b3', 
-      name: 'MSc CS 2023-25', 
-      year: '2023-2025',
-      mode: 'Mini Project',
-      groupCount: 4, 
-      studentCount: 12,
-      progress: 100, 
-      pendingReviews: 0,
-      status: 'Final Eval'
-    },
-  ];
+  React.useEffect(() => {
+    const fetchBatches = async () => {
+      try {
+        const res = await guideApi.getAssignedBatches();
+        const data = (res.data as any).data || res.data;
+        setSupervisedBatches(data);
+      } catch (err) {
+        console.error('Error fetching assigned batches:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchBatches();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -86,15 +68,15 @@ const BatchList: React.FC = () => {
                 <div>
                   <div className="flex justify-between items-center mb-1.5">
                     <span className="text-[10px] font-black text-gray-500 uppercase">Mean Progress</span>
-                    <span className="text-[10px] font-black text-blue-600">{batch.progress}%</span>
+                    <span className="text-[10px] font-black text-blue-600">{batch.submissionProgress}%</span>
                   </div>
                   <div className="h-1.5 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-600" style={{ width: `${batch.progress}%` }}></div>
+                    <div className="h-full bg-blue-600" style={{ width: `${batch.submissionProgress}%` }}></div>
                   </div>
                 </div>
 
                 <button 
-                  onClick={() => navigate(`/guide/batches/${batch.id}`)}
+                  onClick={() => navigate(`/guide/batches/${batch.id}/groups`)}
                   className="w-full mt-4 py-2.5 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-black flex items-center justify-center gap-2 hover:bg-blue-600 hover:text-white transition-all group-hover:shadow-md"
                 >
                   Enter Batch Ecosystem <ChevronRight size={14} />

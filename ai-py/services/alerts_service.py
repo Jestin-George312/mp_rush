@@ -156,7 +156,7 @@ def generate_coordinator_alerts() -> int:
     coords = query(
         """SELECT u.uid, d.id AS dept_id FROM users u
            JOIN departments d ON d.coordinator_id = u.uid
-           WHERE u.role = 'coordinator' AND u.is_deleted = FALSE"""
+           WHERE u.role = 'coordinator' """
     )
     for coord in coords:
         # Unassigned groups
@@ -181,7 +181,7 @@ def generate_coordinator_alerts() -> int:
             """SELECT u.uid AS guide_id, p.full_name, COUNT(g.id)::int AS load
                FROM users u LEFT JOIN profiles p ON p.u_id = u.uid
                LEFT JOIN groups g ON g.guide_id = u.uid
-               WHERE u.role = 'guide' AND u.is_deleted = FALSE
+               WHERE u.role = 'guide' 
                GROUP BY u.uid, p.full_name HAVING COUNT(g.id) >= 8"""
         )
         for r in rows:

@@ -25,7 +25,7 @@ def get_suggested_allocations(batch_id: int) -> list:
                   COALESCE(pr.bio, '') AS specialization, COUNT(g.id)::int AS current_load
            FROM users u LEFT JOIN profiles pr ON pr.u_id = u.uid
            LEFT JOIN groups g ON g.guide_id = u.uid
-           WHERE u.role = 'guide' AND u.is_deleted = FALSE
+           WHERE u.role = 'guide' 
            GROUP BY u.uid, pr.full_name, pr.bio
            HAVING COUNT(g.id) < %s ORDER BY COUNT(g.id) ASC""",
         (load_cfg["hard_cap"],),
@@ -108,7 +108,7 @@ def get_workload_distribution() -> dict:
     rows = query(
         """SELECT u.uid AS guide_id, pr.full_name AS guide_name, COUNT(g.id)::int AS current_load, %s AS max_load
            FROM users u LEFT JOIN profiles pr ON pr.u_id = u.uid LEFT JOIN groups g ON g.guide_id = u.uid
-           WHERE u.role = 'guide' AND u.is_deleted = FALSE
+           WHERE u.role = 'guide' 
            GROUP BY u.uid, pr.full_name ORDER BY current_load DESC""",
         (load_cfg["hard_cap"],),
     )

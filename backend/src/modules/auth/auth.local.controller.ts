@@ -84,7 +84,7 @@ export const loginUser = async (req: Request, res: Response) => {
 
         // 1. Find user and their profile
         const query = `
-      SELECT u.uid, u.email, u.password_hash, u.role, u.is_deleted, p.full_name, p.profile_img 
+      SELECT u.uid, u.email, u.password_hash, u.role, u.is_active, p.full_name, p.profile_img 
       FROM users u 
       LEFT JOIN profiles p ON u.uid = p.u_id 
       WHERE u.email = $1
@@ -97,9 +97,7 @@ export const loginUser = async (req: Request, res: Response) => {
 
         const user = result.rows[0];
 
-        if (user.is_deleted) {
-            return res.status(403).json({ error: 'Account has been deactivated' });
-        }
+        
 
         if (!user.password_hash) {
             return res.status(401).json({ error: 'Please sign in using Google' });

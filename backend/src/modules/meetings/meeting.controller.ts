@@ -54,13 +54,13 @@ export const updateMeeting = async (req: Request, res: Response) => {
         const meetingId = parseInt(req.params.id as string);
         if (isNaN(meetingId)) return sendError(res, 'Invalid meeting ID', 400);
 
-        const { status, meet_link, date, time, duration } = req.body;
+        const { status, meet_link, date, time, duration, minutes } = req.body;
         
         if (status && !['upcoming', 'completed', 'cancelled'].includes(status)) {
             return sendError(res, 'Invalid status', 400);
         }
 
-        const meeting = await meetingService.updateMeeting(meetingId, { status, meet_link, date, time, duration });
+        const meeting = await meetingService.updateMeeting(meetingId, { status, meet_link, date, time, duration, minutes });
         sendSuccess(res, meeting, 'Meeting updated');
     } catch (error: any) {
         logger.error('updateMeeting error:', error.message);

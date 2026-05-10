@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { googleLogin, getCurrentUser } from './auth.controller';
+import { googleLogin, getCurrentUser, logoutUser } from './auth.controller';
 import { registerUser, loginUser } from './auth.local.controller';
 import { requireAuth } from '../../middleware/auth.middleware';
 const router = Router();
@@ -12,5 +12,7 @@ router.post('/register', registerUser);
 router.post('/login', loginUser);
 
 router.get('/me', requireAuth, getCurrentUser);
+
+router.post('/logout', requireAuth, logoutUser);
 
 export default router;

@@ -33,7 +33,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
         p.full_name, p.profile_img, p.department 
       FROM users u 
       LEFT JOIN profiles p ON u.uid = p.u_id 
-      WHERE u.uid = $1 AND u.is_deleted = FALSE
+      WHERE u.uid = $1 
     `;
 
         const result = await pool.query(query, [userId]);
@@ -47,5 +47,18 @@ export const getCurrentUser = async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Get Current User Error:', error);
         res.status(500).json({ error: 'Server error fetching user data' });
+    }
+};
+
+export const logoutUser = async (req: Request, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        if (userId) {
+            await pool.query('UPDATE users SET is_active = FALSE WHERE uid = $1', [userId]);
+        }
+        res.status(200).json({ message: 'Logged out successfully' });
+    } catch (error) {
+        console.error('Logout Error:', error);
+        res.status(500).json({ error: 'Server error during logout' });
     }
 };

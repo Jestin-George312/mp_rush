@@ -7,36 +7,49 @@ import {
   ChevronRight, Calendar, User
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { guideApi } from '../../services/guideApi';
 
 const DocumentReview: React.FC = () => {
   const navigate = useNavigate();
+  const [submissions, setSubmissions] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
 
-  const submissions = [
-    { id: 'd1', group: 'AlphaTech', batch: 'MCA 2024-26 A', type: 'Design Doc', deadline: 'Phase 1 - Design', submittedBy: 'John Doe', time: '2h ago', status: 'Pending' },
-    { id: 'd2', group: 'EcoSync', batch: 'MCA 2024-26 A', type: 'SRS', deadline: 'Phase 1 - SRS', submittedBy: 'Jane Smith', time: '5h ago', status: 'Completed' },
-    { id: 'd3', group: 'Nexus', batch: 'MSc CS 2023-25', type: 'Synopsis', deadline: 'Concept Validation', submittedBy: 'Alice Brown', time: '1d ago', status: 'Pending' },
-    { id: 'd4', group: 'Sentinel', batch: 'MCA 2024-26 B', type: 'Database Schema', deadline: 'Phase 2 - DB', submittedBy: 'Bob Wilson', time: '3d ago', status: 'In Review' },
-  ];
+  React.useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        const res = await guideApi.getPendingDocuments();
+        const data = (res.data as any).data || res.data;
+        setSubmissions(data);
+      } catch (err) {
+        console.error('Error fetching pending documents:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDocuments();
+  }, []);
 
   const headers = ['Identity & Group', 'Document Artifact', 'Context', 'Review Audit', 'Workflow'];
 
   const rows = submissions.map(s => [
     <div className="flex flex-col">
-       <span className="text-xs font-black">{s.group}</span>
-       <span className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">{s.batch}</span>
+       <span className="text-xs font-black">{s.group_name || s.group}</span>
+       <span className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">{s.batch_name || s.batch}</span>
     </div>,
     <div className="flex items-center gap-2">
        <FileText size={16} className="text-blue-500" />
-       <span className="text-xs font-bold text-gray-700 dark:text-gray-200">{s.type}</span>
+       <span className="text-xs font-bold text-gray-700 dark:text-gray-200">{s.name || s.type}</span>
     </div>,
     <div className="flex flex-col">
-       <span className="text-[10px] font-black text-gray-500">{s.deadline}</span>
+       <span className="text-[10px] font-black text-gray-500">{s.deadline_title || s.deadline}</span>
        <div className="flex items-center gap-1 mt-0.5">
           <User size={10} className="text-gray-400" />
-          <span className="text-[10px] font-bold text-gray-400">{s.submittedBy}</span>
+          <span className="text-[10px] font-bold text-gray-400">
+             {s.created_at ? new Date(s.created_at).toLocaleDateString() : s.submittedBy}
+          </span>
        </div>
     </div>,
-    <Badge variant={s.status === 'Completed' ? 'success' : s.status === 'In Review' ? 'warning' : 'default'} className="text-[9px] font-black tracking-widest">
+    <Badge variant={s.status === 'Approved' || s.status === 'Completed' ? 'success' : s.status === 'In Review' || s.status === 'Pending' ? 'warning' : 'default'} className="text-[9px] font-black tracking-widest">
        {s.status.toUpperCase()}
     </Badge>,
     <button 
@@ -76,23 +89,23 @@ const DocumentReview: React.FC = () => {
             <Table headers={headers} rows={rows} />
          </Card>
 
-         <div className="space-y-4">
+          <div className="space-y-4">
             <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Audit Statistics</h3>
             <Card className="bg-blue-500 text-white shadow-xl shadow-blue-500/20">
                <p className="text-[10px] font-black uppercase opacity-70">Total Pending</p>
-               <h4 className="text-3xl font-black mt-1">12</h4>
+               <h4 className="text-3xl font-black mt-1">{submissions.length}</h4>
                <div className="mt-4 pt-4 border-t border-white/10 flex items-center gap-2">
                   <Calendar size={14} />
-                  <span className="text-[10px] font-bold">4 Due today</span>
+                  <span className="text-[10px] font-bold">Awaiting evaluation</span>
                </div>
             </Card>
             
             <Card className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
                <p className="text-[10px] font-black text-gray-400 uppercase">Review Velocity</p>
-               <h4 className="text-xl font-black text-gray-800 dark:text-gray-100 mt-1">85%</h4>
-               <p className="text-[9px] text-gray-400 font-bold mt-1">22 docs reviewed this week</p>
+               <h4 className="text-xl font-black text-gray-800 dark:text-gray-100 mt-1">Real-time stats</h4>
+               <p className="text-[9px] text-gray-400 font-bold mt-1">Based on recent documents</p>
                <div className="w-full h-1 bg-gray-100 dark:bg-gray-700 rounded-full mt-3 overflow-hidden">
-                  <div className="h-full bg-green-500 w-[85%]"></div>
+                  <div className="h-full bg-green-500 w-[50%]"></div>
                </div>
             </Card>
          </div>

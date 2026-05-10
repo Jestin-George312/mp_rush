@@ -2,11 +2,21 @@
 APMS AI Engine — Database Connection Pool
 Connects to the same PostgreSQL database as the Node.js backend.
 """
+import os
 import psycopg2
 from psycopg2 import pool as pg_pool
-from config.settings import settings
+from dotenv import load_dotenv
+
+load_dotenv()
 
 _pool = None
+
+# Read DB config directly from env to avoid circular import with settings
+_DB_USER = os.getenv("DB_USER", "postgres")
+_DB_PASSWORD = os.getenv("DB_PASSWORD", "root")
+_DB_HOST = os.getenv("DB_HOST", "localhost")
+_DB_PORT = int(os.getenv("DB_PORT", "5432"))
+_DB_NAME = os.getenv("DB_NAME", "mp_rush")
 
 
 def get_pool():
@@ -15,11 +25,11 @@ def get_pool():
         _pool = pg_pool.ThreadedConnectionPool(
             minconn=2,
             maxconn=10,
-            user=settings.DB_USER,
-            password=settings.DB_PASSWORD,
-            host=settings.DB_HOST,
-            port=settings.DB_PORT,
-            database=settings.DB_NAME,
+            user=_DB_USER,
+            password=_DB_PASSWORD,
+            host=_DB_HOST,
+            port=_DB_PORT,
+            database=_DB_NAME,
         )
     return _pool
 

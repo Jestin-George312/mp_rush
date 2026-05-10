@@ -1,6 +1,19 @@
 import pool from '../../config/db';
 import bcrypt from 'bcrypt';
 
+export const deleteCoordinator = async (coordinatorId: number) => {
+    const result = await pool.query(
+        `DELETE FROM users WHERE uid = $1 AND role = 'coordinator' RETURNING *`,
+        [coordinatorId]
+    );
+    if (result.rows.length === 0) throw new Error('Coordinator not found');
+
+    // Also unassign from any department
+    await pool.query(`UPDATE departments SET coordinator_id = NULL WHERE coordinator_id = $1`, [coordinatorId]);
+
+    return { deleted: true, id: coordinatorId };
+};
+
 export const getAllDepartments = async () => {
     const result = await pool.query(`
         SELECT d.*, p.full_name AS coordinator_name
@@ -61,7 +74,7 @@ export const listCoordinators = async () => {
         SELECT u.uid, u.email, u.role, p.full_name as name
         FROM users u
         LEFT JOIN profiles p ON u.uid = p.u_id
-        WHERE LOWER(u.role::TEXT) = 'coordinator' AND u.is_deleted = FALSE
+        WHERE LOWER(u.role::TEXT) = 'coordinator' 
     `;
     const result = await pool.query(query);
     return result.rows;

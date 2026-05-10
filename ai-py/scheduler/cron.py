@@ -10,31 +10,31 @@ _scheduler: BackgroundScheduler | None = None
 
 
 def _run_risk_scoring():
-    print("🤖 [CRON] Running risk scoring...")
+    print("[CRON] Running risk scoring...")
     try:
         count = compute_risk_scores()
-        print(f"🤖 [CRON] Risk scoring complete — {count} projects scored")
+        print(f"[CRON] Risk scoring complete — {count} projects scored")
     except Exception as e:
-        print(f"🤖 [CRON] Risk scoring failed: {e}")
+        print(f"[CRON] Risk scoring failed: {e}")
 
 
 def _run_alerts():
-    print("🤖 [CRON] Generating alerts...")
+    print("[CRON] Generating alerts...")
     try:
         g = generate_guide_alerts()
         c = generate_coordinator_alerts()
-        print(f"🤖 [CRON] Alerts generated — guide: {g}, coordinator: {c}")
+        print(f"[CRON] Alerts generated — guide: {g}, coordinator: {c}")
     except Exception as e:
-        print(f"🤖 [CRON] Alert generation failed: {e}")
+        print(f"[CRON] Alert generation failed: {e}")
 
 
 def _run_approvals():
-    print("🤖 [CRON] Checking auto-approvals...")
+    print("[CRON] Checking auto-approvals...")
     try:
         result = batch_check_approvals()
-        print(f"🤖 [CRON] Approval check — {len(result['eligible'])} eligible of {result['total_checked']}")
+        print(f"[CRON] Approval check — {len(result['eligible'])} eligible of {result['total_checked']}")
     except Exception as e:
-        print(f"🤖 [CRON] Approval check failed: {e}")
+        print(f"[CRON] Approval check failed: {e}")
 
 
 def init_scheduler():
@@ -51,7 +51,7 @@ def init_scheduler():
     _scheduler.add_job(_run_approvals, "cron", hour=0, id="predictions")
 
     _scheduler.start()
-    print("🤖 AI Scheduler initialized (APScheduler)")
+    print("[AI] Scheduler initialized (APScheduler)")
 
 
 def trigger_job(job_name: str) -> str:
@@ -73,5 +73,5 @@ def stop_scheduler():
     global _scheduler
     if _scheduler:
         _scheduler.shutdown()
-        print("🤖 Scheduler stopped")
+        print("[AI] Scheduler stopped")
         _scheduler = None

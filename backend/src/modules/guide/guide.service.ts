@@ -1,8 +1,9 @@
 import pool from '../../config/db';
+import * as notificationService from '../notifications/notification.service';
 
 const getHealthLabel = (daysOverdue: number, hasRepo: boolean) => {
     if (daysOverdue > 3) return 'At Risk';
-    if (daysOverdue > 0 || !hasRepo) return 'Warning';
+    if (daysOverdue > 0) return 'Warning';
     return 'Healthy';
 };
 
@@ -107,7 +108,7 @@ export const getBatchGroups = async (guideId: number, batchId: number) => {
     }));
 };
 
-export const getPendingTopics = async (guideId: number) => {
+export const getTopics = async (guideId: number, status: string = 'Pending') => {
     const result = await pool.query(
         `SELECT
             p.id,
@@ -127,12 +128,16 @@ export const getPendingTopics = async (guideId: number) => {
          LEFT JOIN batches b ON b.id = g.batch_id
          LEFT JOIN group_members gm ON gm.group_id = g.id
          LEFT JOIN profiles pr ON pr.u_id = gm.student_id
-         WHERE g.guide_id = $1 AND COALESCE(p.review_state, 'Pending') = 'Pending'
+         WHERE g.guide_id = $1 AND COALESCE(p.review_state, 'Pending') = $2
          GROUP BY p.id, b.name, g.group_name, p.title, p.domain, p.description, p.created_at, p.review_state
          ORDER BY p.created_at DESC`,
-        [guideId]
+        [guideId, status]
     );
     return result.rows;
+};
+
+export const getPendingTopics = async (guideId: number) => {
+    return getTopics(guideId, 'Pending');
 };
 
 export const reviewTopic = async (
@@ -160,11 +165,49 @@ export const reviewTopic = async (
          WHERE p.id = $4
            AND g.id = p.group_id
            AND g.guide_id = $5
-         RETURNING p.*`,
+         RETURNING p.*, g.id AS gid`,
         [target.status, target.reviewState, note || null, projectId, guideId]
     );
     if (result.rows.length === 0) throw new Error('Topic not found');
-    return result.rows[0];
+
+    const project = result.rows[0];
+    await notificationService.notifyGroupMembers(
+        project.gid,
+        'topic_reviewed',
+        `Topic ${target.reviewState}`,
+        `Your project topic has been marked as ${target.reviewState}. Feedback: ${note || 'None'}`,
+        'project',
+        projectId
+    );
+
+    return project;
+};
+
+export const markProjectCompleted = async (guideId: number, projectId: number) => {
+    const result = await pool.query(
+        `UPDATE projects p
+         SET status = 'completed',
+             updated_at = NOW()
+         FROM groups g
+         WHERE p.id = $1
+           AND g.id = p.group_id
+           AND g.guide_id = $2
+         RETURNING p.*, g.id AS gid`,
+        [projectId, guideId]
+    );
+    if (result.rows.length === 0) throw new Error('Project not found or not authorized');
+
+    const project = result.rows[0];
+    await notificationService.notifyGroupMembers(
+        project.gid,
+        'project_completed',
+        'Project Marked Completed',
+        `Your project has been marked as completed by your guide.`,
+        'project',
+        projectId
+    );
+
+    return project;
 };
 
 export const getSupervisedGroups = async (guideId: number) => {
@@ -275,7 +318,7 @@ export const getPendingDocuments = async (guideId: number) => {
 export const reviewDocument = async (
     guideId: number,
     docId: number,
-    status: 'Approved' | 'Rejected',
+    status: 'Approved' | 'Rejected' | 'Needs Revision',
     feedback?: string
 ) => {
     const result = await pool.query(
@@ -293,7 +336,20 @@ export const reviewDocument = async (
         [status, feedback || null, guideId, docId]
     );
     if (result.rows.length === 0) throw new Error('Document not found');
-    return result.rows[0];
+
+    const doc = result.rows[0];
+    if (doc.uploaded_by) {
+        await notificationService.createNotification({
+            user_id: doc.uploaded_by,
+            type: 'doc_reviewed',
+            title: `Document ${status}`,
+            message: `Your document "${doc.name}" has been ${status}. Feedback: ${feedback || 'None'}`,
+            ref_type: 'document',
+            ref_id: docId
+        });
+    }
+
+    return doc;
 };
 
 export const getGitMonitoring = async (guideId: number) => {
@@ -343,4 +399,90 @@ export const getGroupKanban = async (guideId: number, groupId: number) => {
         inprogress: tasks.filter((task) => task.status === 'inprogress'),
         done: tasks.filter((task) => task.status === 'done'),
     };
+};
+
+export const getUpcomingDeadlines = async (guideId: number) => {
+    const result = await pool.query(
+        `SELECT
+            dl.id,
+            dl.title,
+            dl.due_date,
+            b.name AS batch_name,
+            COUNT(DISTINCT g.id)::int AS total_groups,
+            COUNT(DISTINCT d.id) FILTER (WHERE d.id IS NOT NULL)::int AS submitted_count
+         FROM deadlines dl
+         JOIN batches b ON b.id = dl.batch_id
+         JOIN groups g ON g.batch_id = b.id AND g.guide_id = $1
+         LEFT JOIN projects p ON p.group_id = g.id
+         LEFT JOIN documents d ON d.project_id = p.id AND d.deadline_id = dl.id
+         WHERE dl.due_date >= CURRENT_DATE
+         GROUP BY dl.id, dl.title, dl.due_date, b.name
+         ORDER BY dl.due_date ASC
+         LIMIT 5`,
+        [guideId]
+    );
+    return result.rows;
+};
+// ── Extension Requests ─────────────────────────────────────
+export const getExtensionRequests = async (guideId: number) => {
+    const result = await pool.query(
+        `SELECT er.*, g.group_name, dl.title AS deadline_title, dl.due_date AS current_deadline
+         FROM extension_requests er
+         JOIN groups g ON g.id = er.group_id
+         JOIN deadlines dl ON dl.id = er.deadline_id
+         WHERE g.guide_id = $1 AND er.status = 'pending'
+         ORDER BY er.created_at DESC`,
+        [guideId]
+    );
+    return result.rows;
+};
+
+export const reviewExtensionRequest = async (
+    guideId: number,
+    requestId: number,
+    status: 'approved' | 'rejected'
+) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const result = await client.query(
+            `UPDATE extension_requests er
+             SET status = $1, reviewed_by = $2, reviewed_at = NOW()
+             FROM groups g
+             WHERE er.id = $3 AND g.id = er.group_id AND g.guide_id = $2
+             RETURNING er.*, g.id AS gid`,
+            [status, guideId, requestId]
+        );
+        if (result.rows.length === 0) throw new Error('Extension request not found');
+
+        const req = result.rows[0];
+
+        if (status === 'approved') {
+            await client.query(
+                `INSERT INTO group_deadline_overrides (group_id, deadline_id, effective_date, extension_request_id)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT (group_id, deadline_id) 
+                 DO UPDATE SET effective_date = EXCLUDED.effective_date, extension_request_id = EXCLUDED.extension_request_id`,
+                [req.gid, req.deadline_id, req.proposed_date, req.id]
+            );
+        }
+
+        await notificationService.notifyGroupMembers(
+            req.gid,
+            'extension_reviewed',
+            `Extension ${status}`,
+            `Your extension request for milestone has been ${status}.`,
+            'extension',
+            req.id
+        );
+
+        await client.query('COMMIT');
+        return req;
+    } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+    } finally {
+        client.release();
+    }
 };

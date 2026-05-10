@@ -3,7 +3,10 @@ import { requireAuth } from '../../middleware/auth.middleware';
 import { requireRoles } from '../../middleware/role.middleware';
 import {
     assignGuide,
+    assignTempGuide,
+    autoAssignTempGuides,
     createBatch,
+    updateBatch,
     createDeadline,
     createFaculty,
     createStudent,
@@ -19,29 +22,43 @@ import {
     getSubmissionAudit,
     getTopicAudit,
     importStudents,
+    importFaculty,
     updateDeadline,
     updateFaculty,
+    closeBatch,
+    updateStudent,
+    deleteStudent,
+    getBatchFaculty,
+    setBatchFaculty,
 } from './coordinator.controller';
 
 const router = Router();
 
-router.use(requireAuth, requireRoles(['coordinator', 'Coordinator', 'admin', 'Admin']));
+router.use(requireAuth, requireRoles(['coordinator', 'admin']));
 
 router.get('/stats', getStats);
 
 router.get('/faculty', getFaculty);
 router.post('/faculty', createFaculty);
+router.post('/faculty/import', importFaculty);
 router.patch('/faculty/:id', updateFaculty);
 
 router.get('/batches', getBatches);
 router.post('/batches', createBatch);
+router.patch('/batches/:id', updateBatch);
+router.get('/batches/:batchId/faculty', getBatchFaculty);
+router.post('/batches/:batchId/faculty', setBatchFaculty);
 
 router.get('/students', getStudents);
 router.post('/students', createStudent);
 router.post('/students/import', importStudents);
+router.patch('/students/:id', updateStudent);
+router.delete('/students/:id', deleteStudent);
 
 router.get('/allocation/guides/:batchId', getGuideAllocations);
 router.post('/allocation/assign', assignGuide);
+router.post('/allocation/temp-assign', assignTempGuide);
+router.post('/allocation/auto-temp-assign', autoAssignTempGuides);
 
 router.get('/projects', getProjects);
 
@@ -53,5 +70,7 @@ router.delete('/deadlines/:id', deleteDeadline);
 router.get('/audit/submissions', getSubmissionAudit);
 router.get('/audit/topics', getTopicAudit);
 router.get('/audit/health', getProjectHealth);
+
+router.post('/batches/:batchId/close', closeBatch);
 
 export default router;

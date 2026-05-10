@@ -7,21 +7,25 @@ import { UPLOAD_DIR, UPLOAD_URL_PREFIX } from '../../config/storage';
 // POST /api/documents/upload
 // ────────────────────────────────────────────────────────────
 export const uploadDocument = async (
-    uploadedBy: number,
-    data: {
-        project_id: number;
-        type: 'SRS' | 'Reports' | 'Diagrams' | 'Other';
-        filename: string;
-        originalname: string;
-    }
+    userId: number,
+    data: { project_id: number; type: any; filename: string; originalname: string; parent_doc_id?: number }
 ) => {
-    const fileUrl = `${UPLOAD_URL_PREFIX}/${data.filename}`;
+    let version = 1;
+    if (data.parent_doc_id) {
+        const parentRes = await pool.query(
+            `SELECT version FROM documents WHERE id = $1`,
+            [data.parent_doc_id]
+        );
+        if (parentRes.rows.length > 0) {
+            version = parentRes.rows[0].version + 1;
+        }
+    }
 
     const result = await pool.query(
-        `INSERT INTO documents (project_id, uploaded_by, name, file_path, type, status)
-         VALUES ($1, $2, $3, $4, $5, 'Pending')
+        `INSERT INTO documents (project_id, name, file_path, type, uploaded_by, parent_doc_id, version, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'Pending')
          RETURNING *`,
-        [data.project_id, uploadedBy, data.originalname, fileUrl, data.type]
+        [data.project_id, data.originalname, `${UPLOAD_URL_PREFIX}/${data.filename}`, data.type, userId, data.parent_doc_id || null, version]
     );
     return result.rows[0];
 };
@@ -31,9 +35,9 @@ export const uploadDocument = async (
 // ────────────────────────────────────────────────────────────
 export const listDocuments = async (projectId: number) => {
     const result = await pool.query(
-        `SELECT d.*, pr.full_name AS uploader_name
+        `SELECT d.*, p.full_name as uploader_name
          FROM documents d
-         LEFT JOIN profiles pr ON d.uploaded_by = pr.u_id
+         LEFT JOIN profiles p ON p.u_id = d.uploaded_by
          WHERE d.project_id = $1
          ORDER BY d.created_at DESC`,
         [projectId]
@@ -46,11 +50,14 @@ export const listDocuments = async (projectId: number) => {
 // ────────────────────────────────────────────────────────────
 export const updateDocumentStatus = async (
     docId: number,
-    status: 'Approved' | 'Rejected'
+    status: 'Approved' | 'Rejected' | 'Needs Revision',
+    reviewedBy?: number,
+    feedback?: string
 ) => {
     const result = await pool.query(
-        `UPDATE documents SET status = $1 WHERE id = $2 RETURNING *`,
-        [status, docId]
+        `UPDATE documents SET status = $1, reviewed_by = $2, reviewed_at = NOW(), feedback = $3
+         WHERE id = $4 RETURNING *`,
+        [status, reviewedBy || null, feedback || null, docId]
     );
     if (result.rows.length === 0) throw new Error('Document not found');
     return result.rows[0];

@@ -76,6 +76,27 @@ async function seedUsers() {
             credentials.push({ role: coordRole, email: coordEmail, password: coordPassword, fullName: coordFullName });
         }
 
+        // Generate 1 admin
+        const adminEmail = `admin@test.com`;
+        const adminPassword = `Admin123!`;
+        const adminPasswordHash = await bcrypt.hash(adminPassword, salt);
+        const adminRole = 'admin';
+        const adminFullName = `Test Admin`;
+
+        const adminRes = await pool.query(
+            `INSERT INTO users (email, password_hash, auth_provider, role) VALUES ($1, $2, 'local', $3) ON CONFLICT (email) DO NOTHING RETURNING uid`,
+            [adminEmail, adminPasswordHash, adminRole]
+        );
+
+        if (adminRes.rows.length > 0) {
+            const uid = adminRes.rows[0].uid;
+            await pool.query(
+                `INSERT INTO profiles (u_id, full_name) VALUES ($1, $2) ON CONFLICT (u_id) DO NOTHING`,
+                [uid, adminFullName]
+            );
+            credentials.push({ role: adminRole, email: adminEmail, password: adminPassword, fullName: adminFullName });
+        }
+
         console.log('--- CREDENTIALS GENERATED ---');
         console.table(credentials);
         console.log('-----------------------------');
