@@ -788,3 +788,67 @@ export const closeBatch = async (coordinatorId: number, batchId: number) => {
         client.release();
     }
 };
+
+export const resetBatch = async (coordinatorId: number, batchId: number) => {
+    const departmentId = await getCoordinatorDepartmentId(coordinatorId);
+    if (!departmentId) throw new Error('Coordinator is not assigned to any department');
+
+    const batchCheck = await pool.query(
+        `SELECT id FROM batches WHERE id = $1 AND department_id = $2`,
+        [batchId, departmentId]
+    );
+    if (batchCheck.rows.length === 0) throw new Error("Batch not found in coordinator's department");
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Delete tasks linked to projects in this batch
+        await client.query(`
+            DELETE FROM tasks t
+            USING projects p, groups g
+            WHERE t.project_id = p.id AND p.group_id = g.id AND g.batch_id = $1
+        `, [batchId]);
+
+        // 2. Delete documents linked to projects in this batch
+        await client.query(`
+            DELETE FROM documents d
+            USING projects p, groups g
+            WHERE d.project_id = p.id AND p.group_id = g.id AND g.batch_id = $1
+        `, [batchId]);
+
+        // 3. Delete projects in this batch
+        await client.query(`
+            DELETE FROM projects p
+            USING groups g
+            WHERE p.group_id = g.id AND g.batch_id = $1
+        `, [batchId]);
+
+        // 4. Delete group-related data
+        await client.query(`DELETE FROM group_deadline_overrides WHERE group_id IN (SELECT id FROM groups WHERE batch_id = $1)`, [batchId]);
+        await client.query(`DELETE FROM extension_requests WHERE group_id IN (SELECT id FROM groups WHERE batch_id = $1)`, [batchId]);
+        await client.query(`DELETE FROM meetings WHERE group_id IN (SELECT id FROM groups WHERE batch_id = $1)`, [batchId]);
+        await client.query(`DELETE FROM evaluation_scores WHERE group_id IN (SELECT id FROM groups WHERE batch_id = $1)`, [batchId]);
+
+        // 5. Delete group invitations for groups in this batch
+        await client.query(`DELETE FROM group_invitations WHERE group_id IN (SELECT id FROM groups WHERE batch_id = $1)`, [batchId]);
+
+        // 6. Delete group members and groups
+        await client.query(`DELETE FROM group_members WHERE group_id IN (SELECT id FROM groups WHERE batch_id = $1)`, [batchId]);
+        await client.query(`DELETE FROM groups WHERE batch_id = $1`, [batchId]);
+
+        // 7. Clear temp_guide_id for all students in this batch
+        await client.query(`UPDATE users SET temp_guide_id = NULL WHERE batch_id = $1 AND temp_guide_id IS NOT NULL`, [batchId]);
+
+        // 8. Clear notifications for students in this batch
+        await client.query(`DELETE FROM notifications WHERE user_id IN (SELECT uid FROM users WHERE batch_id = $1)`, [batchId]);
+
+        await client.query('COMMIT');
+        return { success: true, message: 'Batch reset successfully. All project and group data has been cleared.' };
+    } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+    } finally {
+        client.release();
+    }
+};

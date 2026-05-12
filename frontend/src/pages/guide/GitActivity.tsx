@@ -5,10 +5,12 @@ import {
   Github, Activity, GitCommit, 
   ExternalLink, Clock, AlertCircle
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 import { guideApi } from '../../services/guideApi';
 
 const GitActivity: React.FC = () => {
+  const navigate = useNavigate();
   const [groupActivity, setGroupActivity] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
@@ -102,7 +104,10 @@ const GitActivity: React.FC = () => {
                    </div>
                  )}
 
-                 <button className="w-full py-3 bg-gray-50 dark:bg-gray-800 text-xs font-black text-gray-700 dark:text-gray-200 rounded-xl hover:bg-gray-100 transition-all flex items-center justify-center gap-2 border border-gray-100 dark:border-gray-700">
+                 <button 
+                  onClick={() => navigate(`/guide/fork-analysis/${group.projectId}`)}
+                  className="w-full py-3 bg-gray-50 dark:bg-gray-800 text-xs font-black text-gray-700 dark:text-gray-200 rounded-xl hover:bg-gray-100 transition-all flex items-center justify-center gap-2 border border-gray-100 dark:border-gray-700"
+                 >
                     <ExternalLink size={16} /> FORK-LEVEL ANALYSIS ON GITHUB
                  </button>
               </div>

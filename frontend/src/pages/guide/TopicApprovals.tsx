@@ -127,47 +127,72 @@ const TopicApprovals: React.FC = () => {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
+      <div className="space-y-8">
         {loading ? (
            <div className="py-20 text-center">
               <Loader2 className="animate-spin h-8 w-8 text-blue-500 mx-auto mb-4" />
               <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Loading Proposals...</p>
            </div>
         ) : topics.length > 0 ? (
-          topics.map((topic) => (
-            <Card key={topic.id} className={`border-l-4 ${
-              topic.status === 'Approved' ? 'border-l-green-500' : 
-              topic.status === 'Rejected' ? 'border-l-red-500' : 'border-l-blue-500'
-            }`}>
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                <div className="flex-1 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <Badge variant="secondary" className="text-[9px] font-black">{topic.batchName}</Badge>
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{topic.domain}</span>
-                    {topic.status !== 'Pending' && (
-                      <Badge variant={topic.status === 'Approved' ? 'success' : 'danger'} className="text-[8px] px-1.5 py-0 uppercase">
-                        {topic.status}
-                      </Badge>
-                    )}
-                  </div>
-                  <h3 className="text-lg font-black text-gray-800 dark:text-white">{topic.title}</h3>
-                  <div className="flex flex-wrap gap-2 text-[10px] text-gray-500 font-bold uppercase">
-                    <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Group: {topic.groupName}</div>
-                    <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span> {topic.members?.length || 0} Members</div>
-                    <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span> {new Date(topic.submittedAt).toLocaleDateString()}</div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={() => handleOpenDetail(topic)}
-                    className="px-4 py-2 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl text-xs font-black flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all border border-gray-100 dark:border-gray-700"
-                  >
-                    <Eye size={16} /> {statusFilter === 'Pending' ? 'Inspect Proposal' : 'View Detail'}
-                  </button>
-                </div>
+          // Group by batchName
+          Object.entries(topics.reduce((acc: any, topic) => {
+            const batch = topic.batchName || 'Unassigned Batch';
+            if (!acc[batch]) acc[batch] = [];
+            acc[batch].push(topic);
+            return acc;
+          }, {})).map(([batchName, batchTopics]: [string, any]) => (
+            <div key={batchName} className="space-y-4">
+              <div className="flex items-center gap-4">
+                 <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest bg-gray-50 dark:bg-gray-800/50 px-4 py-1 rounded-lg border border-gray-100 dark:border-gray-700">
+                    Batch: {batchName}
+                 </h2>
+                 <div className="h-px bg-gray-100 dark:bg-gray-800 flex-1"></div>
+                 <Badge variant="secondary" className="text-[9px]">{batchTopics.length} Total</Badge>
               </div>
-            </Card>
+              
+              <div className="grid grid-cols-1 gap-4">
+                {batchTopics.map((topic: any) => (
+                  <Card key={topic.id} className={`border-l-4 transition-all hover:shadow-md ${
+                    topic.status === 'Approved' ? 'border-l-green-500' : 
+                    topic.status === 'Rejected' ? 'border-l-red-500' : 
+                    topic.status === 'Revision Requested' ? 'border-l-orange-500' : 'border-l-blue-500'
+                  }`}>
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                      <div className="flex-1 space-y-3">
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{topic.domain || 'General'}</span>
+                          {topic.isResubmitted && (
+                            <Badge className="bg-orange-500 text-white border-none text-[8px] px-1.5 py-0 uppercase animate-pulse">
+                              RE-SUBMITTED
+                            </Badge>
+                          )}
+                          {topic.status !== 'Pending' && (
+                            <Badge variant={topic.status === 'Approved' ? 'success' : 'danger'} className="text-[8px] px-1.5 py-0 uppercase">
+                              {topic.status}
+                            </Badge>
+                          )}
+                        </div>
+                        <h3 className="text-lg font-black text-gray-800 dark:text-white">{topic.title}</h3>
+                        <div className="flex flex-wrap gap-2 text-[10px] text-gray-500 font-bold uppercase">
+                          <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Group: {topic.groupName}</div>
+                          <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span> {topic.members?.length || 0} Members</div>
+                          <div className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span> {new Date(topic.submittedAt).toLocaleDateString()}</div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => handleOpenDetail(topic)}
+                          className="px-4 py-2 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl text-xs font-black flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all border border-gray-100 dark:border-gray-700"
+                        >
+                          <Eye size={16} /> {statusFilter === 'Pending' ? 'Inspect Proposal' : 'View Detail'}
+                        </button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
           ))
         ) : (
           <div className="py-20 text-center bg-gray-50 dark:bg-gray-800/50 rounded-2xl border-2 border-dashed border-gray-100 dark:border-gray-700">

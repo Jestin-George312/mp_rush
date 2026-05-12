@@ -310,3 +310,15 @@ export const closeBatch = async (req: Request, res: Response) => {
         sendError(res, error.message || 'Could not close batch', 500);
     }
 };
+
+export const resetBatch = async (req: Request, res: Response) => {
+    try {
+        const batchId = parseInt(req.params.batchId as string);
+        if (isNaN(batchId)) return sendError(res, 'Invalid batch id', 400);
+        const data = await coordinatorService.resetBatch(req.user!.id, batchId);
+        sendSuccess(res, data, 'Batch reset successfully');
+    } catch (error: any) {
+        logger.error('coordinator.resetBatch error:', error.message);
+        sendError(res, error.message || 'Could not reset batch', 500);
+    }
+};

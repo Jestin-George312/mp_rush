@@ -78,16 +78,28 @@ export const getGroupMessages = async (req: Request, res: Response) => {
                 m.sender_id,
                 m.text,
                 m.created_at,
+                m.attachment_url,
                 p.full_name as sender_name,
-                u.role
+                u.role as sender_role
             FROM messages m
-            JOIN users u ON m.sender_id = u.id
-            LEFT JOIN profiles p ON u.id = p.u_id
+            JOIN users u ON m.sender_id = u.uid
+            LEFT JOIN profiles p ON u.uid = p.u_id
             WHERE m.group_id = $1
             ORDER BY m.created_at ASC
             LIMIT $2 OFFSET $3`,
             [groupId, limit, offset]
         );
+
+        const mappedMessages = result.rows.map(m => ({
+            id: m.id,
+            groupId: m.group_id,
+            senderId: m.sender_id,
+            text: m.text,
+            attachmentUrl: m.attachment_url,
+            senderName: m.sender_name || 'User',
+            senderRole: m.sender_role?.toLowerCase(),
+            createdAt: m.created_at
+        }));
 
         // Get total count
         const countResult = await pool.query(
@@ -96,7 +108,7 @@ export const getGroupMessages = async (req: Request, res: Response) => {
         );
 
         sendSuccess(res, {
-            messages: result.rows,
+            messages: mappedMessages,
             pagination: {
                 page,
                 limit,
@@ -136,11 +148,9 @@ export const getGroupDetails = async (req: Request, res: Response) => {
 
         // Fetch group details
         const groupResult = await pool.query(
-            `SELECT g.id, g.name, g.guide_id, u.full_name as guide_name
+            `SELECT g.id, g.group_name, g.guide_id, pr.full_name as guide_name
              FROM groups g
-             LEFT JOIN (
-                SELECT id, full_name FROM profiles p JOIN users u ON p.u_id = u.id
-             ) u ON g.guide_id = u.id
+             LEFT JOIN profiles pr ON g.guide_id = pr.u_id
              WHERE g.id = $1`,
             [groupId]
         );
@@ -153,8 +163,8 @@ export const getGroupDetails = async (req: Request, res: Response) => {
         const membersResult = await pool.query(
             `SELECT gm.student_id as id, p.full_name, u.role, u.email
              FROM group_members gm
-             JOIN users u ON gm.student_id = u.id
-             LEFT JOIN profiles p ON u.id = p.u_id
+             JOIN users u ON gm.student_id = u.uid
+             LEFT JOIN profiles p ON u.uid = p.u_id
              WHERE gm.group_id = $1
              ORDER BY p.full_name ASC`,
             [groupId]
@@ -163,7 +173,7 @@ export const getGroupDetails = async (req: Request, res: Response) => {
         const group = groupResult.rows[0];
         sendSuccess(res, {
             id: group.id,
-            name: group.name,
+            name: group.group_name,
             guide: {
                 id: group.guide_id,
                 name: group.guide_name || 'N/A',

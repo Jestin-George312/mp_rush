@@ -9,13 +9,16 @@ const getHealthLabel = (daysOverdue: number, hasRepo: boolean) => {
 
 export const getGuideStats = async (guideId: number) => {
     const [batchesRes, groupsRes, topicsRes, docsRes, deadlinesRes, riskRes] = await Promise.all([
-        pool.query(`SELECT COUNT(DISTINCT batch_id)::int AS count FROM groups WHERE guide_id = $1 AND batch_id IS NOT NULL`, [guideId]),
+        pool.query(`SELECT COUNT(DISTINCT batch_id)::int AS count FROM batch_faculty WHERE faculty_id = $1`, [guideId]),
         pool.query(`SELECT COUNT(*)::int AS count FROM groups WHERE guide_id = $1`, [guideId]),
         pool.query(
             `SELECT COUNT(*)::int AS count
              FROM projects p
              JOIN groups g ON g.id = p.group_id
-             WHERE g.guide_id = $1 AND COALESCE(p.review_state, 'Pending') = 'Pending'`,
+             LEFT JOIN group_members gm ON gm.group_id = g.id
+             LEFT JOIN users u ON u.uid = gm.student_id
+             WHERE (g.guide_id = $1 OR u.temp_guide_id = $1) 
+               AND COALESCE(p.review_state, 'Pending') IN ('Pending', 'Revision Requested')`,
             [guideId]
         ),
         pool.query(
@@ -23,14 +26,16 @@ export const getGuideStats = async (guideId: number) => {
              FROM documents d
              JOIN projects p ON p.id = d.project_id
              JOIN groups g ON g.id = p.group_id
-             WHERE g.guide_id = $1 AND d.status = 'Pending'`,
+             LEFT JOIN group_members gm ON gm.group_id = g.id
+             LEFT JOIN users u ON u.uid = gm.student_id
+             WHERE (g.guide_id = $1 OR u.temp_guide_id = $1) AND d.status = 'Pending'`,
             [guideId]
         ),
         pool.query(
             `SELECT COUNT(*)::int AS count
              FROM deadlines dl
-             JOIN groups g ON g.batch_id = dl.batch_id
-             WHERE g.guide_id = $1 AND dl.due_date >= CURRENT_DATE`,
+             JOIN batch_faculty bf ON bf.batch_id = dl.batch_id
+             WHERE bf.faculty_id = $1 AND dl.due_date >= CURRENT_DATE`,
             [guideId]
         ),
         pool.query(
@@ -38,7 +43,9 @@ export const getGuideStats = async (guideId: number) => {
              FROM groups g
              LEFT JOIN projects p ON p.group_id = g.id
              LEFT JOIN tasks t ON t.project_id = p.id
-             WHERE g.guide_id = $1 AND t.deadline < CURRENT_DATE AND t.status != 'done'`,
+             LEFT JOIN group_members gm ON gm.group_id = g.id
+             LEFT JOIN users u ON u.uid = gm.student_id
+             WHERE (g.guide_id = $1 OR u.temp_guide_id = $1) AND t.deadline < CURRENT_DATE AND t.status != 'done'`,
             [guideId]
         ),
     ]);
@@ -58,17 +65,21 @@ export const getAssignedBatches = async (guideId: number) => {
         `SELECT
             b.id,
             b.name,
+            b.start_year AS year,
+            CASE WHEN b.is_active THEN 'Active' ELSE 'Closed' END AS status,
+            b.project_type_mode AS mode,
             COUNT(DISTINCT g.id)::int AS "groupCount",
             COUNT(DISTINCT gm.student_id)::int AS "studentCount",
             COALESCE(ROUND(100.0 * SUM(CASE WHEN d.status = 'Approved' THEN 1 ELSE 0 END) / NULLIF(COUNT(d.id), 0)), 0)::int AS "submissionProgress",
             SUM(CASE WHEN d.status = 'Pending' THEN 1 ELSE 0 END)::int AS "pendingReviews"
-         FROM groups g
-         JOIN batches b ON b.id = g.batch_id
+         FROM batch_faculty bf
+         JOIN batches b ON b.id = bf.batch_id
+         LEFT JOIN groups g ON g.batch_id = b.id AND g.guide_id = $1
          LEFT JOIN group_members gm ON gm.group_id = g.id
          LEFT JOIN projects p ON p.group_id = g.id
          LEFT JOIN documents d ON d.project_id = p.id
-         WHERE g.guide_id = $1
-         GROUP BY b.id, b.name
+         WHERE bf.faculty_id = $1
+         GROUP BY b.id, b.name, b.start_year, b.is_active, b.project_type_mode
          ORDER BY b.name`,
         [guideId]
     );
@@ -119,6 +130,7 @@ export const getTopics = async (guideId: number, status: string = 'Pending') => 
             p.description,
             p.created_at AS "submittedAt",
             COALESCE(p.review_state, 'Pending') AS status,
+            (p.updated_at > COALESCE(p.topic_reviewed_at, p.created_at) + interval '10 seconds') AS "isResubmitted",
             COALESCE(
                 json_agg(pr.full_name ORDER BY pr.full_name) FILTER (WHERE pr.full_name IS NOT NULL),
                 '[]'
@@ -128,7 +140,12 @@ export const getTopics = async (guideId: number, status: string = 'Pending') => 
          LEFT JOIN batches b ON b.id = g.batch_id
          LEFT JOIN group_members gm ON gm.group_id = g.id
          LEFT JOIN profiles pr ON pr.u_id = gm.student_id
-         WHERE g.guide_id = $1 AND COALESCE(p.review_state, 'Pending') = $2
+         LEFT JOIN users u ON u.uid = gm.student_id
+         WHERE (g.guide_id = $1 OR u.temp_guide_id = $1) 
+           AND (
+             ($2 = 'Pending' AND COALESCE(p.review_state, 'Pending') IN ('Pending', 'Revision Requested'))
+             OR ($2 != 'Pending' AND p.review_state = $2)
+           )
          GROUP BY p.id, b.name, g.group_name, p.title, p.domain, p.description, p.created_at, p.review_state
          ORDER BY p.created_at DESC`,
         [guideId, status]
@@ -162,9 +179,11 @@ export const reviewTopic = async (
              topic_reviewed_at = NOW(),
              updated_at = NOW()
          FROM groups g
+         LEFT JOIN group_members gm ON gm.group_id = g.id
+         LEFT JOIN users u ON u.uid = gm.student_id
          WHERE p.id = $4
            AND g.id = p.group_id
-           AND g.guide_id = $5
+           AND (g.guide_id = $5 OR u.temp_guide_id = $5)
          RETURNING p.*, g.id AS gid`,
         [target.status, target.reviewState, note || null, projectId, guideId]
     );
@@ -249,7 +268,7 @@ export const getSupervisedGroups = async (guideId: number) => {
 
 export const getGroupDetails = async (guideId: number, groupId: number) => {
     const groupRes = await pool.query(
-        `SELECT g.*, b.name AS batch_name, p.id AS project_id, p.title, p.description, p.review_state, p.github_repo
+        `SELECT g.*, b.name AS batch_name, p.id AS project_id, p.title, p.description, p.domain, p.review_state, p.github_repo
          FROM groups g
          LEFT JOIN batches b ON b.id = g.batch_id
          LEFT JOIN projects p ON p.group_id = g.id
@@ -357,6 +376,7 @@ export const getGitMonitoring = async (guideId: number) => {
         `SELECT
             g.id AS group_id,
             g.group_name,
+            p.id AS project_id,
             p.title,
             p.github_repo,
             p.updated_at
@@ -370,6 +390,7 @@ export const getGitMonitoring = async (guideId: number) => {
     return result.rows.map((row) => ({
         groupId: row.group_id,
         groupName: row.group_name,
+        projectId: row.project_id,
         title: row.title,
         repoUrl: row.github_repo,
         lastCommit: row.github_repo
@@ -412,7 +433,8 @@ export const getUpcomingDeadlines = async (guideId: number) => {
             COUNT(DISTINCT d.id) FILTER (WHERE d.id IS NOT NULL)::int AS submitted_count
          FROM deadlines dl
          JOIN batches b ON b.id = dl.batch_id
-         JOIN groups g ON g.batch_id = b.id AND g.guide_id = $1
+         JOIN batch_faculty bf ON bf.batch_id = b.id AND bf.faculty_id = $1
+         LEFT JOIN groups g ON g.batch_id = b.id AND g.guide_id = $1
          LEFT JOIN projects p ON p.group_id = g.id
          LEFT JOIN documents d ON d.project_id = p.id AND d.deadline_id = dl.id
          WHERE dl.due_date >= CURRENT_DATE

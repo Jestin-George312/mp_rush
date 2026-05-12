@@ -138,10 +138,14 @@ export const getStudentProject = async (studentId: number) => {
     );
 
     return {
-        id: String(project.id || project.group_id),
+        id: String(project.id),
+        groupId: project.group_id,
         title: project.title || 'Untitled Project',
         description: project.description || '',
         status: project.review_state || 'Pending',
+        topicFeedback: project.topic_feedback || null,
+        createdAt: project.created_at,
+        reviewedAt: project.topic_reviewed_at,
         mode: membersRes.rows.length > 1 ? 'Group' : 'Individual',
         batchName: project.batch_name || 'Unassigned Batch',
         guideName: project.guide_name || null,
@@ -157,7 +161,14 @@ export const getStudentProject = async (studentId: number) => {
 
 export const createStudentProject = async (
     studentId: number,
-    data: { title: string; description: string; mode: string; memberEmails?: string[] }
+    data: { 
+        title: string; 
+        description: string; 
+        domain: string;
+        mode: string; 
+        memberEmails?: string[];
+        githubRepo?: string;
+    }
 ) => {
     const client = await pool.connect();
     try {
@@ -208,10 +219,34 @@ export const createStudentProject = async (
                 ? `${profileRes.rows[0]?.full_name || 'Student'} Team`
                 : `${profileRes.rows[0]?.full_name || 'Student'} Solo`;
 
-            // Note: guide_id is left NULL here as per Requirement 3 (main allocation happens later)
+            // Resolve guide: use temp_guide_id if available, otherwise auto-assign from batch_faculty
+            const studentRow = await client.query(`SELECT temp_guide_id FROM users WHERE uid = $1`, [studentId]);
+            let guideId = studentRow.rows[0]?.temp_guide_id || null;
+
+            if (!guideId) {
+                // Auto-assign a guide from batch_faculty using round-robin based on current group count
+                const facultyRes = await client.query(
+                    `SELECT f.faculty_id FROM batch_faculty f
+                     JOIN users u ON u.uid = f.faculty_id
+                     WHERE f.batch_id = $1 AND LOWER(u.account_status) = 'active'
+                     ORDER BY f.faculty_id`,
+                    [batch.id]
+                );
+                if (facultyRes.rows.length > 0) {
+                    const groupCountRes = await client.query(
+                        `SELECT COUNT(*)::int AS cnt FROM groups WHERE batch_id = $1`, [batch.id]
+                    );
+                    const idx = (groupCountRes.rows[0]?.cnt || 0) % facultyRes.rows.length;
+                    guideId = facultyRes.rows[idx].faculty_id;
+
+                    // Also set this student's temp_guide_id for consistency
+                    await client.query(`UPDATE users SET temp_guide_id = $1 WHERE uid = $2`, [guideId, studentId]);
+                }
+            }
+
             const newGroupRes = await client.query(
-                `INSERT INTO groups (group_name, batch_id) VALUES ($1, $2) RETURNING id`,
-                [groupName, batch.id]
+                `INSERT INTO groups (group_name, batch_id, guide_id) VALUES ($1, $2, $3) RETURNING id`,
+                [groupName, batch.id, guideId]
             );
             groupId = newGroupRes.rows[0].id;
 
@@ -245,12 +280,53 @@ export const createStudentProject = async (
             }
         }
 
-        const projectRes = await client.query(
-            `INSERT INTO projects (group_id, title, description, submitted_by, status, review_state)
-             VALUES ($1, $2, $3, $4, 'pending', 'Pending')
-             RETURNING *`,
-            [groupId, data.title, data.description, studentId]
+        // 3. Create or Update Project
+        const existingProject = await client.query(
+            `SELECT id FROM projects WHERE group_id = $1`, [groupId]
         );
+
+        let projectRes;
+        if (existingProject.rows.length > 0) {
+            // Update existing project
+            projectRes = await client.query(
+                `UPDATE projects 
+                 SET title = $2, 
+                     domain = $3, 
+                     description = $4, 
+                     submitted_by = $5, 
+                     github_repo = $6,
+                     status = 'pending', 
+                     review_state = 'Pending',
+                     updated_at = NOW()
+                 WHERE id = $1
+                 RETURNING *`,
+                [existingProject.rows[0].id, data.title, data.domain || null, data.description, studentId, data.githubRepo || null]
+            );
+
+            // Notify the guide about the resubmission
+            const project = projectRes.rows[0];
+            const guideRes = await client.query(`SELECT guide_id FROM groups WHERE id = $1`, [groupId]);
+            const guideId = guideRes.rows[0]?.guide_id;
+            
+            if (guideId) {
+                await notificationService.createNotification({
+                    user_id: guideId,
+                    type: 'topic_resubmitted',
+                    title: 'Topic Resubmitted',
+                    message: `The student has updated and resubmitted their project topic: "${data.title}".`,
+                    ref_type: 'project',
+                    ref_id: project.id
+                });
+            }
+        } else {
+            // Insert new project
+            projectRes = await client.query(
+                `INSERT INTO projects (group_id, title, domain, description, submitted_by, github_repo, status, review_state)
+                 VALUES ($1, $2, $3, $4, $5, $6, 'pending', 'Pending')
+                 RETURNING *`,
+                [groupId, data.title, data.domain || null, data.description, studentId, data.githubRepo || null]
+            );
+        }
 
         await client.query('COMMIT');
         return projectRes.rows[0];

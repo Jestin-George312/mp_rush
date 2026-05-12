@@ -125,6 +125,20 @@ const BatchManagement: React.FC = () => {
         }
     };
 
+    const handleResetBatch = async () => {
+        if (!editingBatch) return;
+        if (!window.confirm('Are you absolutely sure? This will delete all student projects, documents, tasks, and groups in this batch. Only students, faculty, assignments, and deadlines will remain. Students will have to form groups and submit proposals again.')) return;
+        
+        try {
+            await coordApi.resetBatch(editingBatch.id);
+            toast.success('Batch workflows reset successfully');
+            // Force a full page reload to clear any cached student dashboard data
+            window.location.reload();
+        } catch (error) {
+            toast.error('Failed to reset batch workflows');
+        }
+    };
+
     const handleSaveFaculty = async () => {
         if (!editingBatch) return;
         try {
@@ -408,6 +422,23 @@ const BatchManagement: React.FC = () => {
                     <div className="flex gap-3 pt-4 border-t border-[rgb(var(--color-border))]">
                         <Button variant="outline" className="flex-1" onClick={() => setIsSettingsModalOpen(false)}>Cancel</Button>
                         <Button variant="primary" className="flex-1" onClick={handleUpdateBatch}>Save Changes</Button>
+                    </div>
+
+                    <div className="pt-4 border-t border-[rgb(var(--color-border))]">
+                        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-xl">
+                            <h4 className="text-xs font-black uppercase tracking-widest text-red-600 mb-2">Danger Zone</h4>
+                            <p className="text-[10px] text-red-500 mb-4">
+                                This will delete all student groups, project proposals, tasks, and submissions for this batch. 
+                                Students and faculty assignments will be kept, but students must restart the project workflow.
+                            </p>
+                            <Button 
+                                variant="outline" 
+                                className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+                                onClick={handleResetBatch}
+                            >
+                                Reset Batch Workflows
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </Modal>

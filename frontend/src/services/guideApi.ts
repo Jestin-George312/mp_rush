@@ -28,6 +28,7 @@ export interface TopicProposal {
   description: string;
   submittedAt: string;
   status: 'Pending' | 'Approved' | 'Rejected' | 'Revision Requested';
+  isResubmitted?: boolean;
 }
 
 export interface ProjectGroupMeta {
@@ -91,6 +92,7 @@ export const guideApi = {
 
   // Git Activity
   getGitActivity: () => api.get<any[]>('/guide/git-monitoring'),
+  getForkAnalysis: (projectId: string) => api.get<any>(`/github/analyze/${projectId}`),
   
   // Kanban Oversight
   getGroupKanban: (groupId: string) => api.get<any>(`/guide/groups/${groupId}/kanban`),

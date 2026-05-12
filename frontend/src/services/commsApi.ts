@@ -1,8 +1,8 @@
 import api from '../utils/api';
 
 export const fetchMessages = async (groupId: number) => {
-    const res = await api.get(`/comms/messages?groupId=${groupId}`);
-    return res.data;
+    const res = await api.get(`/comms/messages/group/${groupId}`);
+    return res.data.data.messages;
 };
 
 export const sendMessage = async (groupId: number, text: string, file?: File) => {

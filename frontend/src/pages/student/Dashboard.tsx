@@ -123,6 +123,31 @@ const StudentDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* Revision Feedback Section */}
+      {project?.status === 'Revision Requested' && (
+        <Card className="border-l-4 border-l-orange-500 bg-orange-50/50 dark:bg-orange-900/10">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-orange-100 dark:bg-orange-900/30 text-orange-600 rounded-2xl shrink-0">
+               <MessageSquare size={24} />
+            </div>
+            <div>
+              <h2 className="text-sm font-black uppercase tracking-widest text-orange-600 mb-2">Revision Requested by Guide</h2>
+              <p className="text-sm text-gray-700 dark:text-gray-300 font-medium leading-relaxed">
+                "{project.topicFeedback || 'No detailed feedback provided. Please contact your guide for more information.'}"
+              </p>
+              <div className="mt-4 flex items-center gap-2">
+                 <button 
+                  onClick={() => navigate('/student/project-setup')}
+                  className="px-4 py-2 bg-orange-600 text-white text-[10px] font-black rounded-lg hover:bg-orange-700 transition-all flex items-center gap-2"
+                 >
+                    RE-SUBMIT TOPIC <ArrowRight size={14} />
+                 </button>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
          {/* Left: Project Stats & Progress */}
          <div className="lg:col-span-2 space-y-6">

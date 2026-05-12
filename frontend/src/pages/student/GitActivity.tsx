@@ -1,23 +1,39 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Card from '../../components/common/UI/Card';
 import Badge from '../../components/common/UI/Badge';
 import { 
   Github, GitCommit, GitBranch, 
-  Activity, Info, Code 
+  Activity, Info, Code, Loader2
 } from 'lucide-react';
+import { studentApi } from '../../services/studentApi';
 
 const StudentGitActivity: React.FC = () => {
-  const repoData = {
-    name: 'alphatech/shm-project',
-    branch: 'main',
-    totalCommits: 42,
-    lastPush: '2 hours ago',
-    commits: [
-      { id: 'c1', msg: 'Implement JWT Auth flow', author: 'You', time: '2h ago', hash: '8f2a1c' },
-      { id: 'c2', msg: 'Setup docker configuration', author: 'Jane Smith', time: '5h ago', hash: '4d3b9e' },
-      { id: 'c3', msg: 'Fix mobile responsiveness on dashboard', author: 'You', time: '1d ago', hash: '2a1f8c' },
-    ]
-  };
+  const [data, setData] = useState<{repoUrl: string | null, commits: any[]}>({ repoUrl: null, commits: [] });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchGitData = async () => {
+      try {
+        const res = await studentApi.getGitCommits();
+        setData(res.data.data);
+      } catch (err) {
+        console.error('Error fetching git activity:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchGitData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="animate-spin text-blue-600" size={40} />
+      </div>
+    );
+  }
+
+  const repoName = data.repoUrl ? data.repoUrl.replace('https://github.com/', '') : 'No Repository Linked';
 
   return (
     <div className="space-y-6">
@@ -26,9 +42,14 @@ const StudentGitActivity: React.FC = () => {
            <h1 className="text-2xl font-black tracking-tight text-gray-800 dark:text-white">Code & Commits</h1>
            <p className="text-gray-500">Monitor your project's technical progression via GitHub Sync</p>
         </div>
-        <button className="px-4 py-2 bg-gray-900 text-white rounded-xl text-xs font-black flex items-center gap-2 shadow-lg shadow-gray-900/10">
-           <Github size={18} /> OPEN REPOSITORY
-        </button>
+        {data.repoUrl && (
+          <button 
+            onClick={() => window.open(data.repoUrl!, '_blank')}
+            className="px-4 py-2 bg-gray-900 text-white rounded-xl text-xs font-black flex items-center gap-2 shadow-lg shadow-gray-900/10"
+          >
+             <Github size={18} /> OPEN REPOSITORY
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -41,17 +62,17 @@ const StudentGitActivity: React.FC = () => {
                   </div>
                   <Badge className="bg-blue-600 text-white border-none text-[9px] font-black uppercase">LIVE SYNC</Badge>
                </div>
-               <h3 className="text-lg font-black tracking-tight truncate">{repoData.name}</h3>
+               <h3 className="text-lg font-black tracking-tight truncate">{repoName}</h3>
                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Primary GitHub Target</p>
                
                <div className="grid grid-cols-2 gap-4 mt-8 pt-8 border-t border-white/10">
                   <div>
-                     <p className="text-[9px] font-black text-gray-500 uppercase">Commits</p>
-                     <p className="text-xl font-black">{repoData.totalCommits}</p>
+                     <p className="text-[9px] font-black text-gray-500 uppercase">Latest Feed</p>
+                     <p className="text-xl font-black">{data.commits.length} Recent</p>
                   </div>
                   <div>
-                     <p className="text-[9px] font-black text-gray-500 uppercase">Last Push</p>
-                     <p className="text-xl font-black">{repoData.lastPush}</p>
+                     <p className="text-[9px] font-black text-gray-500 uppercase">Status</p>
+                     <p className="text-xl font-black">{data.repoUrl ? 'Active' : 'Missing'}</p>
                   </div>
                </div>
             </Card>
@@ -61,7 +82,7 @@ const StudentGitActivity: React.FC = () => {
                   <GitBranch size={20} className="text-blue-600" />
                   <div>
                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Active Branch</p>
-                     <p className="text-sm font-black text-gray-800 dark:text-white">{repoData.branch}</p>
+                     <p className="text-sm font-black text-gray-800 dark:text-white">main</p>
                   </div>
                </div>
             </Card>
@@ -80,28 +101,37 @@ const StudentGitActivity: React.FC = () => {
                <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
                   <Activity size={14} /> Recent Sync Activity
                </h3>
-               <button className="text-[10px] font-black text-blue-600 uppercase hover:underline">Refresh Logs</button>
+               <button 
+                onClick={() => window.location.reload()}
+                className="text-[10px] font-black text-blue-600 uppercase hover:underline"
+               >
+                 Refresh Logs
+               </button>
             </div>
             <Card>
                <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {repoData.commits.map((commit) => (
-                    <div key={commit.id} className="py-4 first:pt-0 last:pb-0 group">
+                  {data.commits.length > 0 ? data.commits.map((commit: any) => (
+                    <div key={commit.sha} className="py-4 first:pt-0 last:pb-0 group">
                        <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
-                             <div className={`p-1.5 rounded-lg ${commit.author === 'You' ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-400'}`}>
+                             <div className={`p-1.5 rounded-lg bg-blue-50 text-blue-600`}>
                                 <GitCommit size={14} />
                              </div>
-                             <span className="text-xs font-bold text-gray-700 dark:text-gray-200">{commit.msg}</span>
+                             <span className="text-xs font-bold text-gray-700 dark:text-gray-200">{commit.message}</span>
                           </div>
-                          <code className="text-[10px] font-mono text-gray-400 bg-gray-50 dark:bg-gray-900 px-2 py-0.5 rounded uppercase">{commit.hash}</code>
+                          <code className="text-[10px] font-mono text-gray-400 bg-gray-50 dark:bg-gray-900 px-2 py-0.5 rounded uppercase">{commit.sha.substring(0, 7)}</code>
                        </div>
                        <div className="flex items-center gap-3 ml-8">
                           <span className="text-[9px] font-black text-gray-400 uppercase">{commit.author}</span>
                           <span className="w-1 h-1 rounded-full bg-gray-300"></span>
-                          <span className="text-[9px] font-black text-gray-400 uppercase">{commit.time}</span>
+                          <span className="text-[9px] font-black text-gray-400 uppercase">{new Date(commit.date).toLocaleString()}</span>
                        </div>
                     </div>
-                  ))}
+                  )) : (
+                    <div className="py-8 text-center text-gray-400 italic text-sm">
+                      No commits found. Make sure your repository is public or your token has access.
+                    </div>
+                  )}
                </div>
             </Card>
             

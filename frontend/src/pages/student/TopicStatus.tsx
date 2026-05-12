@@ -46,13 +46,13 @@ const TopicStatus: React.FC = () => {
   const topicData = {
     title: project.title,
     status: project.status,
-    submittedAt: new Date(project.created_at || new Date()).toLocaleString(),
-    guideComments: project.topic_feedback || 'Waiting for initial review.',
+    submittedAt: new Date(project.createdAt || new Date()).toLocaleString(),
+    guideComments: project.topicFeedback || 'Waiting for initial review.',
     guideName: project.guideName || 'Not Assigned',
     history: [
-       { date: new Date(project.created_at).toLocaleDateString(), event: 'Proposal Submitted', status: 'Pending' },
-       ...(project.guideName ? [{ date: new Date(project.created_at).toLocaleDateString(), event: `Assigned to ${project.guideName}`, status: 'Guide Assigned' }] : []),
-       { date: project.topic_reviewed_at ? new Date(project.topic_reviewed_at).toLocaleDateString() : '...', event: 'Current Status', status: project.status },
+       { date: new Date(project.createdAt).toLocaleDateString(), event: 'Proposal Submitted', status: 'Pending' },
+       ...(project.guideName ? [{ date: new Date(project.createdAt).toLocaleDateString(), event: `Assigned to ${project.guideName}`, status: 'Guide Assigned' }] : []),
+       { date: project.reviewedAt ? new Date(project.reviewedAt).toLocaleDateString() : '...', event: 'Current Status', status: project.status },
     ]
   };
 

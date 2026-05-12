@@ -25,7 +25,7 @@ export const getProject = async (req: Request, res: Response) => {
 
 export const createProject = async (req: Request, res: Response) => {
     try {
-        const { title, description, mode, memberEmails } = req.body;
+        const { title, description, domain, mode, memberEmails } = req.body;
         if (!title || !description || !mode) {
             return sendError(res, 'title, description and mode are required', 400);
         }
@@ -33,6 +33,7 @@ export const createProject = async (req: Request, res: Response) => {
         const data = await studentService.createStudentProject(req.user!.id, {
             title,
             description,
+            domain: domain as string,
             mode,
             memberEmails,
         });

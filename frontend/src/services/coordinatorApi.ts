@@ -22,6 +22,8 @@ export const updateBatch = (id: number, data: any) => api.patch(`/coordinator/ba
 export const getBatchFaculty = (batchId: number) => api.get(`/coordinator/batches/${batchId}/faculty`);
 export const setBatchFaculty = (batchId: number, data: { facultyIds: number[] }) => api.post(`/coordinator/batches/${batchId}/faculty`, data);
 export const autoAssignTempGuides = (batchId: number) => api.post('/coordinator/allocation/auto-temp-assign', { batchId });
+export const closeBatch = (batchId: number) => api.post(`/coordinator/batches/${batchId}/close`);
+export const resetBatch = (batchId: number) => api.post(`/coordinator/batches/${batchId}/reset`);
 
 // --- 4. Student Management ---
 export const getStudents = (params?: any) => api.get('/coordinator/students', { params });

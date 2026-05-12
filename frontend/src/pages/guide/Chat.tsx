@@ -49,28 +49,28 @@ const Chat: React.FC = () => {
         socket.emit('join_group', gid);
 
         // Fetch initial messages
-        fetchMessages(gid).then(res => {
-            const mapped = res.data.map((m: any) => ({
+        fetchMessages(gid).then(data => {
+            const mapped = data.map((m: any) => ({
                 id: String(m.id),
                 text: m.text,
-                sender: m.sender_role,
-                senderName: m.sender_name,
-                attachment_url: m.attachment_url,
-                timestamp: new Date(m.created_at)
+                sender: m.senderRole,
+                senderName: m.senderName,
+                attachment_url: m.attachmentUrl,
+                timestamp: new Date(m.createdAt)
             }));
             setMessages(mapped);
         }).catch(console.error);
 
         // Listen for new messages
         const handleNewMessage = (m: any) => {
-            if (m.group_id === gid) {
+            if (m.group_id === gid || m.groupId === gid) {
                 setMessages(prev => [...prev, {
                     id: String(m.id),
                     text: m.text,
-                    sender: m.role || m.sender_role,
-                    senderName: m.sender_name,
-                    attachment_url: m.attachment_url,
-                    timestamp: new Date(m.created_at)
+                    sender: m.senderRole || m.role,
+                    senderName: m.senderName,
+                    attachment_url: m.attachmentUrl || m.attachment_url,
+                    timestamp: new Date(m.createdAt || m.created_at)
                 }]);
             }
         };
@@ -88,12 +88,36 @@ const Chat: React.FC = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
+    const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '') || 'http://localhost:5000';
+
     const handleSend = async () => {
         if ((!inputValue.trim() && !selectedFile) || !selectedGroup) return;
 
         const gid = parseInt(selectedGroup.id);
+        const msgText = inputValue.trim();
+        const fileToUpload = selectedFile;
+
         try {
-            await sendMessage(gid, inputValue, selectedFile || undefined);
+            const res = await sendMessage(gid, msgText, fileToUpload || undefined);
+            
+            // Get the actual URL returned by the backend
+            const serverAttachmentUrl = res?.data?.data?.attachment_url || res?.data?.data?.attachmentUrl;
+
+            // Optimistic update: show your own message immediately
+            const sentMsg: Message = {
+                id: res?.data?.data?.id ? String(res.data.data.id) : `temp-${Date.now()}`,
+                text: msgText,
+                sender: 'guide',
+                senderName: user?.name || 'Guide',
+                attachment_url: serverAttachmentUrl,
+                timestamp: new Date()
+            };
+
+            setMessages(prev => {
+                if (prev.some(m => m.id === sentMsg.id)) return prev;
+                return [...prev, sentMsg];
+            });
+
             setInputValue('');
             setSelectedFile(null);
             if (fileInputRef.current) fileInputRef.current.value = '';
@@ -114,13 +138,18 @@ const Chat: React.FC = () => {
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
+    const getFullFileUrl = (path: string) => {
+        if (path.startsWith('http')) return path;
+        return `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+    };
+
     const filteredGroups = groups.filter(g =>
         g.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         g.title.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     return (
-        <div className="h-[calc(100vh-120px)] flex gap-0 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="h-[calc(100vh-120px)] flex gap-0 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-800">
             {/* Left Column - Group List */}
             <div className="w-80 flex-shrink-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/20">
@@ -132,7 +161,7 @@ const Chat: React.FC = () => {
                             placeholder="Search groups..."
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 rounded-lg bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 border text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="w-full pl-10 pr-4 py-2 rounded-lg bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 border text-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium"
                         />
                     </div>
                 </div>
@@ -153,14 +182,14 @@ const Chat: React.FC = () => {
                             <div className="flex-1 min-w-0">
                                 <h3 className="font-bold truncate text-sm">{group.name}</h3>
                                 <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate uppercase font-black">{group.title}</p>
-                                <p className="text-xs text-gray-400 mt-1 truncate font-medium">Click to chat</p>
+                                <p className="text-xs text-gray-400 mt-1 truncate font-medium italic">Click to coordinate</p>
                             </div>
                         </button>
                     ))}
                     {filteredGroups.length === 0 && (
                         <div className="p-8 text-center text-gray-400">
                             <Users size={40} className="mx-auto mb-2 opacity-20" />
-                            <p className="text-xs font-bold uppercase tracking-widest">No groups found</p>
+                            <p className="text-xs font-bold uppercase tracking-widest font-black">No groups found</p>
                         </div>
                     )}
                 </div>
@@ -170,63 +199,68 @@ const Chat: React.FC = () => {
             <div className="flex-1 flex flex-col bg-white dark:bg-gray-800">
                 {selectedGroup ? (
                     <>
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white/50 backdrop-blur-md">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black">
+                                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black shadow-lg shadow-blue-500/20">
                                     {selectedGroup.name.charAt(0)}
                                 </div>
                                 <div>
-                                    <h3 className="font-bold">{selectedGroup.name}</h3>
-                                    <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+                                    <h3 className="font-bold text-gray-800 dark:text-white">{selectedGroup.name}</h3>
+                                    <div className="flex items-center gap-2 text-xs text-gray-500 font-bold">
                                         <Users size={12} />
                                         <span>{selectedGroup.members.length} members</span>
-                                        <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
+                                        <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
                                         <span className="capitalize">{connected ? 'Live' : 'Offline'}</span>
                                     </div>
                                 </div>
                             </div>
-                            <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full">
+                            <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors">
                                 <MoreVertical size={20} />
                             </button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50 dark:bg-gray-900/50">
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50 dark:bg-gray-900/50 scroll-smooth">
                             {messages.map(message => (
                                 <div
                                     key={message.id}
                                     className={`flex ${message.sender === 'guide' ? 'justify-end' : 'justify-start'}`}
                                 >
                                     <div
-                                        className={`max-w-[70%] px-4 py-3 rounded-2xl shadow-sm ${message.sender === 'guide'
-                                            ? 'bg-blue-600 text-white rounded-br-md'
-                                            : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-bl-md'
+                                        className={`max-w-[70%] px-4 py-3 rounded-2xl shadow-sm transition-all hover:scale-[1.01] ${message.sender === 'guide'
+                                            ? 'bg-blue-600 text-white rounded-br-md shadow-lg shadow-blue-500/20'
+                                            : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-bl-md border border-gray-100 dark:border-gray-700'
                                             }`}
                                     >
-                                        <p className={`text-[10px] font-black mb-1 uppercase ${message.sender === 'guide' ? 'text-blue-100' : 'text-blue-500'}`}>
+                                        <p className={`text-[10px] font-black mb-1 uppercase tracking-wider ${message.sender === 'guide' ? 'text-blue-100' : 'text-blue-500'}`}>
                                             {message.senderName || message.sender}
                                         </p>
                                         
-                                        {message.text && <p className="text-sm leading-relaxed font-medium">{message.text}</p>}
+                                        {message.text && <p className="text-sm leading-relaxed font-bold">{message.text}</p>}
                                         
                                         {message.attachment_url && (
                                             <a 
-                                                href={message.attachment_url} 
+                                                href={getFullFileUrl(message.attachment_url)} 
                                                 target="_blank" 
                                                 rel="noreferrer"
-                                                className={`mt-2 flex items-center gap-2 p-2 rounded-lg border ${
+                                                className={`mt-2 flex items-center gap-3 p-3 rounded-xl border transition-all hover:bg-black/5 ${
                                                     message.sender === 'guide'
                                                     ? 'bg-white/10 border-white/20 text-white'
                                                     : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600'
                                                 }`}
                                             >
-                                                <FileIcon size={16} />
-                                                <span className="text-xs font-bold truncate max-w-[150px]">
-                                                    {message.attachment_url.split('/').pop()}
-                                                </span>
+                                                <div className="p-2 bg-white/20 rounded-lg text-blue-500">
+                                                    <FileIcon size={18} />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <span className="text-xs font-black truncate block">
+                                                        {message.attachment_url.split('/').pop()?.split('-').shift() || 'Attachment'}
+                                                    </span>
+                                                    <span className="text-[9px] opacity-60 uppercase font-black">Click to open</span>
+                                                </div>
                                             </a>
                                         )}
 
-                                        <span className={`text-[9px] mt-1 block font-bold ${message.sender === 'guide' ? 'text-blue-100' : 'text-gray-400'}`}>
+                                        <span className={`text-[9px] mt-2 block font-black text-right ${message.sender === 'guide' ? 'text-blue-100' : 'text-gray-400'}`}>
                                             {formatTime(message.timestamp)}
                                         </span>
                                     </div>

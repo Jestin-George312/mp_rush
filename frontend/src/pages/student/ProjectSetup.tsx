@@ -26,19 +26,43 @@ const ProjectSetup: React.FC = () => {
     title: '',
     description: '',
     domain: 'ML & Data Science',
-    customDomain: ''
+    customDomain: '',
+    githubRepo: ''
   });
 
   React.useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [matesRes, settingsRes] = await Promise.all([
-          studentApi.getBatchMates(),
-          studentApi.getBatchSettings()
-        ]);
-        setBatchMates((matesRes.data as any).data || matesRes.data);
-        
-        const settings = (settingsRes.data as any).data || settingsRes.data;
+          const [matesRes, settingsRes, projectRes] = await Promise.all([
+            studentApi.getBatchMates(),
+            studentApi.getBatchSettings(),
+            studentApi.getProjectDetails()
+          ]);
+          setBatchMates((matesRes.data as any).data || matesRes.data);
+          
+          const settings = (settingsRes.data as any).data || settingsRes.data;
+          const currentProject = (projectRes.data as any).data;
+
+          if (currentProject) {
+            setFormData({
+              title: currentProject.title,
+              description: currentProject.description,
+              domain: currentProject.domain || 'ML & Data Science',
+              customDomain: '',
+              githubRepo: currentProject.github_repo || ''
+            });
+            setMode(currentProject.mode.toLowerCase() as any);
+            if (currentProject.members) {
+              const otherMembers = currentProject.members.filter((m: any) => !m.is_leader);
+              setMembers(otherMembers.map((m: any) => m.email));
+            }
+            // If already approved or pending, we might want to hide the form, 
+            // but the user specifically asked for "editable". 
+            // We'll allow it if status is 'Revision Requested' or 'Pending'.
+            if (currentProject.status === 'Approved') {
+              setSuccess(true);
+            }
+          }
         if (settings) {
           if (settings.project_type_mode) {
             const pm = settings.project_type_mode.toLowerCase();
@@ -98,7 +122,8 @@ const ProjectSetup: React.FC = () => {
       
       await studentApi.createProject({
         title: formData.title,
-        description: `${formData.description}\n\nDomain: ${finalDomain}`,
+        description: formData.description,
+        domain: finalDomain,
         mode: mode === 'individual' ? 'Individual' : 'Group',
         memberEmails
       });

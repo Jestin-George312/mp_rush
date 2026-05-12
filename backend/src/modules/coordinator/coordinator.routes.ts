@@ -30,6 +30,7 @@ import {
     deleteStudent,
     getBatchFaculty,
     setBatchFaculty,
+    resetBatch,
 } from './coordinator.controller';
 
 const router = Router();
@@ -72,5 +73,6 @@ router.get('/audit/topics', getTopicAudit);
 router.get('/audit/health', getProjectHealth);
 
 router.post('/batches/:batchId/close', closeBatch);
+router.post('/batches/:batchId/reset', resetBatch);
 
 export default router;

@@ -22,6 +22,7 @@ import guideRoutes from './modules/guide/guide.routes';
 import coordinatorRoutes from './modules/coordinator/coordinator.routes';
 import extensionRoutes from './modules/extensions/extension.routes';
 import notificationRoutes from './modules/notifications/notification.routes';
+import githubRoutes from './modules/projects/github.routes';
 
 // Import Utilities
 import { errorHandler } from './middleware/error.middleware';
@@ -63,6 +64,7 @@ app.use('/api/guide', guideRoutes);
 app.use('/api/coordinator', coordinatorRoutes);
 app.use('/api/extensions', extensionRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/github', githubRoutes);
 
 // Basic Health Check Route (Checks Express AND Postgres)
 app.get('/health', async (req: Request, res: Response) => {

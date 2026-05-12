@@ -24,6 +24,9 @@ export interface StudentProject {
   title: string;
   description: string;
   status: 'Pending' | 'Approved' | 'Revision Requested';
+  topicFeedback?: string;
+  createdAt: string;
+  reviewedAt?: string;
   mode: 'Individual' | 'Group';
   batchName: string;
   guideName?: string;
@@ -62,7 +65,7 @@ export const studentApi = {
   
   // Project & Grouping
   getProjectDetails: () => api.get<StudentProject>('/student/project'),
-  createProject: (payload: { title: string; description: string; mode: string; memberEmails?: string[] }) => 
+  createProject: (payload: { title: string; description: string; domain: string; mode: string; memberEmails?: string[] }) => 
     api.post('/student/project', payload),
   
   // Invitations
@@ -98,7 +101,7 @@ export const studentApi = {
   getFeedback: () => api.get<any[]>('/student/feedback'),
 
   // GitHub
-  linkRepository: (repoUrl: string) => api.post('/student/project/github', { repoUrl }),
-  getGitCommits: () => api.get<any[]>('/student/project/git/commits'),
+  linkRepository: (repoUrl: string) => api.post('/github/link', { repoUrl }),
+  getGitCommits: () => api.get<any[]>('/github/commits'),
   getBatchSettings: () => api.get<any>('/student/batch-settings'),
 };

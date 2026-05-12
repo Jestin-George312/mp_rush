@@ -43,6 +43,7 @@ import ComplianceTracker from './pages/guide/Compliance';
 import GuideChat from './pages/guide/Chat';
 import GuideMeetings from './pages/guide/Meetings';
 import GuideExtensions from './pages/guide/Extensions';
+import ForkAnalysis from './pages/guide/ForkAnalysis';
 
 // Coordinator pages
 import CoordinatorDashboard from './pages/coordinator/Dashboard';
@@ -134,6 +135,7 @@ function App() {
                                 <Route path="/guide/chat" element={<GuideChat />} />
                                 <Route path="/guide/meetings" element={<GuideMeetings />} />
                                 <Route path="/guide/extensions" element={<GuideExtensions />} />
+                                <Route path="/guide/fork-analysis/:projectId" element={<ForkAnalysis />} />
                                 <Route path="/guide/profile" element={<Profile />} />
                                 <Route path="/guide" element={<Navigate to="/guide/dashboard" replace />} />
 
