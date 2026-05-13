@@ -484,6 +484,28 @@ export const getUpcomingDeadlines = async (guideId: number) => {
     );
     return result.rows;
 };
+
+export const getBatchDeadlines = async (batchId: number, guideId: number) => {
+    const result = await pool.query(
+        `SELECT 
+            dl.id,
+            dl.title,
+            dl.due_date,
+            b.name as batch_name,
+            COUNT(DISTINCT g.id)::int AS total_groups,
+            COUNT(DISTINCT d.id) FILTER (WHERE d.id IS NOT NULL)::int AS submitted_count
+         FROM deadlines dl 
+         JOIN batches b ON b.id = dl.batch_id
+         LEFT JOIN groups g ON g.batch_id = b.id AND g.guide_id = $2
+         LEFT JOIN projects p ON p.group_id = g.id
+         LEFT JOIN documents d ON d.project_id = p.id AND d.deadline_id = dl.id
+         WHERE dl.batch_id = $1 
+         GROUP BY dl.id, dl.title, dl.due_date, b.name
+         ORDER BY dl.due_date ASC`,
+        [batchId, guideId]
+    );
+    return result.rows;
+};
 // ── Extension Requests ─────────────────────────────────────
 export const getExtensionRequests = async (guideId: number) => {
     const result = await pool.query(

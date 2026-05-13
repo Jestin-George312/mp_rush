@@ -113,8 +113,7 @@ const STUDENT_NAV: NavSection[] = [
   {
     label: 'Communication',
     links: [
-      { to: '/student/chat', label: 'Messages', icon: <MessageSquare size={18} /> },
-      { to: '/student/meetings', label: 'Meetings', icon: <Video size={18} /> },
+      { to: '/student/chat', label: 'Messages', icon: <MessageSquare size={18} /> }
     ]
   }
 ];
@@ -139,9 +138,7 @@ const GUIDE_NAV: NavSection[] = [
   {
     label: 'Project Insights',
     links: [
-      { to: '/guide/git-activity', label: 'Commit Activity', icon: <Activity size={18} /> },
-      { to: '/guide/compliance', label: 'Compliance Tracker', icon: <CheckCircle size={18} />, alert: true },
-      { to: '/guide/extensions', label: 'Extensions', icon: <Hourglass size={18} /> },
+      { to: '/guide/git-activity', label: 'Commit Activity', icon: <Activity size={18} /> }
     ]
   },
   {
@@ -392,7 +389,7 @@ const Sidebar: React.FC = () => {
                       {user.role}
                     </span>
                     <div className="w-1 h-1 rounded-full bg-gray-300"></div>
-                    <span className="text-[9px] font-bold text-gray-400">ID: 4122</span>
+                    <span className="text-[9px] font-bold text-gray-400">ID: {user.id}</span>
                   </div>
                 </div>
                 <MoreVertical size={16} className="text-gray-400 flex-shrink-0" />

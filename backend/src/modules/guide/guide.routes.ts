@@ -18,6 +18,7 @@ import {
     requestRevision,
     reviewDocument,
     getUpcomingDeadlines,
+    getBatchDeadlines,
     markProjectCompleted,
     getExtensionRequests,
     handleExtensionRequest,
@@ -43,6 +44,7 @@ router.post('/documents/:docId/review', upload.single('file'), reviewDocument);
 router.get('/git-monitoring', getGitMonitoring);
 router.get('/groups/:groupId/kanban', getGroupKanban);
 router.get('/deadlines/upcoming', getUpcomingDeadlines);
+router.get('/batches/:batchId/deadlines', getBatchDeadlines);
 router.get('/extensions/pending', getExtensionRequests);
 router.post('/extensions/:id/review', handleExtensionRequest);
 

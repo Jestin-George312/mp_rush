@@ -75,7 +75,7 @@ const StudentDashboard: React.FC = () => {
          <div className="relative z-10">
             <div className="flex items-center gap-2 mb-2">
                <Badge className="bg-white/20 text-white border-none text-[9px] font-black uppercase tracking-widest">
-                  Academic Cycle 2024-26
+                  {stats?.batchName || 'Academic Cycle'}
                </Badge>
             </div>
             <h1 className="text-3xl font-black tracking-tight">Project Hub</h1>
@@ -103,7 +103,7 @@ const StudentDashboard: React.FC = () => {
                 <div className="flex flex-col h-full">
                   <div className="flex-1">
                     <h3 className="font-black text-sm mb-1">{inv.project_title}</h3>
-                    <p className="text-xs text-gray-500 font-medium">Invited by <span className="text-orange-600 font-bold">{inv.inv_name || inv.inviter_name}</span></p>
+                    <p className="text-xs text-gray-500 font-medium">Invited by <span className="text-orange-600 font-bold">{inv.inviter_name}</span></p>
                   </div>
                   <div className="flex gap-2 mt-4">
                     <button 
@@ -181,13 +181,13 @@ const StudentDashboard: React.FC = () => {
                   onClick={() => navigate('/student/deadlines')}
                >
                   <div className="flex items-center justify-between mb-4">
-                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Upcoming Deadline</p>
+                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Upcoming Milestone</p>
                      <span className="text-orange-600 animate-pulse"><AlertTriangle size={16} /></span>
                   </div>
                   <div className="flex items-end justify-between">
                      <div>
-                        <h3 className="text-xl font-black text-orange-600">{daysLeft !== null ? `${daysLeft} Days Left` : 'No Deadlines'}</h3>
-                        <p className="text-xs text-gray-500 font-bold">{stats?.nextDeadline ? new Date(stats.nextDeadline).toLocaleDateString() : 'Stay tuned'}</p>
+                        <h3 className="text-xl font-black text-orange-600">{daysLeft !== null ? `${daysLeft} Days Left` : 'All Caught Up'}</h3>
+                        <p className="text-xs text-gray-500 font-bold">{stats?.nextDeadline ? new Date(stats.nextDeadline).toLocaleDateString() : 'No pending deadlines'}</p>
                      </div>
                      <div className="p-3 bg-orange-50 dark:bg-orange-900/20 text-orange-600 rounded-xl">
                         <Clock size={24} />
@@ -198,10 +198,10 @@ const StudentDashboard: React.FC = () => {
 
             <Card 
                className="relative cursor-pointer hover:shadow-lg transition-shadow"
-               onClick={() => navigate('/student/tasks')}
+               onClick={() => navigate('/student/deadlines')}
             >
                <div className="flex items-center justify-between mb-8">
-                  <h2 className="text-sm font-black uppercase tracking-widest text-gray-400">Project Progress (Tasks)</h2>
+                  <h2 className="text-sm font-black uppercase tracking-widest text-gray-400">Batch Milestones</h2>
                   <Badge variant="secondary" className="font-black">
                      {stats ? Math.round((stats.kanbanTasks.done / (stats.kanbanTasks.todo + stats.kanbanTasks.inProgress + stats.kanbanTasks.done || 1)) * 100) : 0}% Sync
                   </Badge>
@@ -239,12 +239,9 @@ const StudentDashboard: React.FC = () => {
                            </div>
                         );
                       }) : (
-                        ['Plan', 'Design', 'Develop', 'Launch'].map(step => (
-                           <div key={step} className="text-center opacity-30">
-                              <div className="text-[9px] font-black uppercase mb-1 text-gray-300">Upcoming</div>
-                              <p className="text-[10px] font-bold text-gray-500">{step}</p>
-                           </div>
-                        ))
+                        <div className="col-span-4 py-4 text-center">
+                           <p className="text-[10px] font-bold text-gray-400 italic">No milestones defined for your batch cycle yet</p>
+                        </div>
                       )}
                    </div>
                </div>

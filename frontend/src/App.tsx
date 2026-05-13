@@ -44,6 +44,7 @@ import GuideChat from './pages/guide/Chat';
 import GuideMeetings from './pages/guide/Meetings';
 import GuideExtensions from './pages/guide/Extensions';
 import CommitActivity from './pages/guide/CommitActivity';
+import BatchDeadlines from './pages/guide/BatchDeadlines';
 
 // Coordinator pages
 import CoordinatorDashboard from './pages/coordinator/Dashboard';
@@ -116,7 +117,6 @@ function App() {
                                 <Route path="/student/progress" element={<ProgressInsights />} />
                                 <Route path="/student/archive" element={<DocumentArchive />} />
                                 <Route path="/student/chat" element={<StudentChat />} />
-                                <Route path="/student/meetings" element={<StudentMeetings />} />
                                 <Route path="/student/profile" element={<Profile />} />
                                 <Route path="/student" element={<Navigate to="/student/dashboard" replace />} />
 
@@ -124,6 +124,7 @@ function App() {
                                 <Route path="/guide/dashboard" element={<GuideDashboard />} />
                                 <Route path="/guide/topics" element={<TopicApprovals />} />
                                 <Route path="/guide/batches" element={<BatchList />} />
+                                <Route path="/guide/batches/:batchId/deadlines" element={<BatchDeadlines />} />
                                 <Route path="/guide/batches/:batchId/groups" element={<ProjectGroupsGuide />} />
                                 <Route path="/guide/groups" element={<ProjectGroupsGuide />} />
                                 <Route path="/guide/groups/:groupId" element={<GroupDetailsGuide />} />
@@ -131,10 +132,8 @@ function App() {
                                 <Route path="/guide/documents/:docId" element={<FeedbackUI />} />
                                 <Route path="/guide/kanban" element={<KanbanOversight />} />
                                 <Route path="/guide/git-activity" element={<GitActivityIndicator />} />
-                                <Route path="/guide/compliance" element={<ComplianceTracker />} />
                                 <Route path="/guide/chat" element={<GuideChat />} />
                                 <Route path="/guide/meetings" element={<GuideMeetings />} />
-                                <Route path="/guide/extensions" element={<GuideExtensions />} />
                                 <Route path="/guide/commit-activity/:projectId" element={<CommitActivity />} />
                                 <Route path="/guide/profile" element={<Profile />} />
                                 <Route path="/guide" element={<Navigate to="/guide/dashboard" replace />} />

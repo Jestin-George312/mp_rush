@@ -20,16 +20,19 @@ const RepositoryManager: React.FC = () => {
   const [isLinking, setIsLinking] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [healthReport, setHealthReport] = useState<any>(null);
+  const [stats, setStats] = useState<any>(null);
 
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [projectRes, commitsRes] = await Promise.all([
+      const [projectRes, commitsRes, statsRes] = await Promise.all([
         studentApi.getProjectDetails(),
-        studentApi.getGitCommits()
+        studentApi.getGitCommits(),
+        studentApi.getDashboardStats()
       ]);
-      setProject((projectRes.data as any).data || projectRes.data);
-      setCommits((commitsRes.data as any).data || commitsRes.data);
+      setProject(projectRes.data.data);
+      setCommits(commitsRes.data.data);
+      setStats(statsRes.data.data);
     } catch (err) {
       console.error('Fetch error:', err);
     } finally {
@@ -167,10 +170,12 @@ const RepositoryManager: React.FC = () => {
                            <h5 className="text-2xl font-black tracking-tight">{commits.length}</h5>
                         </div>
                         <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl">
+                           <h5 className={`text-lg font-black tracking-tight mt-1 ${stats?.systemStatus === 'Active Sync' ? 'text-green-600' : 'text-gray-500'}`}>
+                             {stats?.systemStatus || 'Pending'}
+                           </h5>
                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1">
-                              <Activity size={12} className="text-orange-500" /> System Status
+                              <Activity size={12} className="text-orange-500" /> Infrastructure
                            </p>
-                           <h5 className="text-lg font-black tracking-tight text-gray-500 mt-1">Healthy</h5>
                         </div>
                      </div>
                   </div>

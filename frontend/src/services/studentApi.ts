@@ -17,6 +17,8 @@ export type StudentStats = {
     done: number;
   };
   unreadMessages: number;
+  batchName: string;
+  systemStatus: string;
 }
 
 export interface StudentProject {
@@ -31,13 +33,17 @@ export interface StudentProject {
   mode: 'Individual' | 'Group';
   batchName: string;
   guideName?: string;
+  guideEmail?: string;
   members: {
     uid: string;
     full_name: string;
     email: string;
     is_leader: boolean;
+    tasks_done: number;
+    commits_count: number;
   }[];
   github_repo?: string;
+  teamActivity?: number;
 }
 
 export interface StudentInvitation {
@@ -62,24 +68,24 @@ export interface Notification {
 
 export const studentApi = {
   // Profile & Stats
-  getDashboardStats: () => api.get<StudentStats>('/student/stats'),
+  getDashboardStats: () => api.get<{ data: StudentStats }>('/student/stats'),
   
   // Project & Grouping
-  getProjectDetails: () => api.get<StudentProject>('/student/project'),
+  getProjectDetails: () => api.get<{ data: StudentProject }>('/student/project'),
   createProject: (payload: { title: string; description: string; domain: string; mode: string; memberEmails?: string[] }) => 
     api.post('/student/project', payload),
   
   // Invitations
-  getInvitations: () => api.get<StudentInvitation[]>('/student/invitations'),
+  getInvitations: () => api.get<{ data: StudentInvitation[] }>('/student/invitations'),
   respondToInvitation: (id: number, accept: boolean) => 
     api.post(`/student/invitations/${id}/respond`, { accept }),
 
   // Notifications
-  getNotifications: () => api.get<Notification[]>('/notifications'),
+  getNotifications: () => api.get<{ data: Notification[] }>('/notifications'),
   markNotificationRead: (id: number) => api.patch(`/notifications/${id}/read`),
 
   // Submissions
-  getSubmissionStatus: () => api.get<any[]>('/student/submissions'),
+  getSubmissionStatus: () => api.get<{ data: any[] }>('/student/submissions'),
   submitDocument: (payload: { project_id: number; type: string; documentName: string; deadlineId?: string }, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -95,17 +101,17 @@ export const studentApi = {
   deleteSubmission: (docId: number) => api.delete(`/student/submissions/${docId}`),
   
   // Kanban
-  getTasks: () => api.get<any[]>('/student/tasks'),
+  getTasks: () => api.get<{ data: any[] }>('/student/tasks'),
   createTask: (payload: any) => api.post('/student/tasks', payload),
   updateTask: (taskId: string, payload: any) => api.patch(`/student/tasks/${taskId}`, payload),
   
-  getDeadlines: () => api.get<any[]>('/student/deadlines'),
-  getBatchMates: () => api.get<any[]>('/student/batch-mates'),
-  getFeedback: () => api.get<any[]>('/student/feedback'),
+  getDeadlines: () => api.get<{ data: any[] }>('/student/deadlines'),
+  getBatchMates: () => api.get<{ data: any[] }>('/student/batch-mates'),
+  getFeedback: () => api.get<{ data: any[] }>('/student/feedback'),
 
   // GitHub
   linkRepository: (repoUrl: string) => api.post('/student/project/github', { repoUrl }),
-  getGitCommits: () => api.get<any[]>('/student/project/git/commits'),
-  getGitHealth: (projectId: number | string) => api.get<any>(`/github/project/${projectId}/health`),
-  getBatchSettings: () => api.get<any>('/student/batch-settings'),
+  getGitCommits: () => api.get<{ data: any[] }>('/student/project/git/commits'),
+  getGitHealth: (projectId: number | string) => api.get<{ data: any }>(`/github/project/${projectId}/health`),
+  getBatchSettings: () => api.get<{ data: any }>('/student/batch-settings'),
 };

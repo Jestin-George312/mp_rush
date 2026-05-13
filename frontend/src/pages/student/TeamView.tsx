@@ -18,7 +18,7 @@ const TeamView: React.FC = () => {
     const fetchData = async () => {
       try {
         const projRes = await studentApi.getProjectDetails();
-        setProject((projRes.data as any).data || projRes.data);
+        setProject(projRes.data.data);
       } catch (err) {
         console.error('Fetch team error:', err);
       } finally {
@@ -41,8 +41,8 @@ const TeamView: React.FC = () => {
     name: m.full_name,
     role: m.is_leader ? 'Group Leader' : 'Collaborator',
     email: m.email,
-    commits: 0,
-    tasks: 0
+    commits: m.commits_count || 0,
+    tasks: m.tasks_done || 0
   }));
 
   return (
@@ -149,37 +149,6 @@ const TeamView: React.FC = () => {
 
          {/* Sidebar Stats */}
          <div className="space-y-6">
-            <Card className="bg-gradient-to-br from-gray-900 to-indigo-900 text-white border-none shadow-2xl relative overflow-hidden">
-               <div className="relative z-10 p-2">
-                  <h4 className="text-lg font-black tracking-tight">Technical Supervisor</h4>
-                  <p className="text-xs text-blue-400 font-bold uppercase tracking-widest mt-1">
-                     {project?.guideName || 'Unassigned Guide'}
-                  </p>
-                  
-                  <div className="mt-8 space-y-4">
-                     <div className="flex items-center gap-3 p-3 bg-white/10 rounded-2xl border border-white/10">
-                        <div className="p-2 bg-blue-600 rounded-xl">
-                           <Mail size={16} />
-                        </div>
-                        <div className="overflow-hidden">
-                           <p className="text-[10px] font-black uppercase text-gray-400">Email Guide</p>
-                           <p className="text-xs font-bold truncate">support@apms.edu</p>
-                        </div>
-                     </div>
-                     
-                     <div className="flex gap-3">
-                        <button className="flex-1 py-3 bg-white/10 rounded-2xl hover:bg-white/20 transition-all flex items-center justify-center gap-2">
-                           <Video size={16} />
-                           <span className="text-[10px] font-black uppercase tracking-widest">Call</span>
-                        </button>
-                        <button className="flex-1 py-3 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20">
-                           Schedule
-                        </button>
-                     </div>
-                  </div>
-               </div>
-               <Shield size={160} className="absolute right-0 bottom-0 translate-y-12 translate-x-12 opacity-10 -rotate-12" />
-            </Card>
             
             <Card className="border-t-4 border-t-indigo-500">
                <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6">Group Metadata</h4>
@@ -195,10 +164,13 @@ const TeamView: React.FC = () => {
                   <div className="pt-6 border-t border-gray-100 dark:border-gray-700">
                      <div className="flex items-center justify-between mb-2">
                         <p className="text-[9px] font-black text-gray-400 uppercase">Team Activity</p>
-                        <span className="text-[10px] font-black text-indigo-500">78%</span>
+                        <span className="text-[10px] font-black text-indigo-500">{project?.teamActivity || 0}%</span>
                      </div>
                      <div className="h-2 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-indigo-500 rounded-full w-[78%]"></div>
+                        <div 
+                           className="h-full bg-indigo-500 rounded-full transition-all duration-1000" 
+                           style={{ width: `${project?.teamActivity || 0}%` }}
+                        ></div>
                      </div>
                   </div>
                </div>

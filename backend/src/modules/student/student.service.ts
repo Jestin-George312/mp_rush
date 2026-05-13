@@ -58,9 +58,10 @@ export const getStudentStats = async (studentId: number) => {
         if (row.status === 'done') taskMap.done = row.count;
     }
 
-    // Get student's batch_id from users table (even if no project/group yet)
-    const userBatchRes = await pool.query(`SELECT batch_id FROM users WHERE uid = $1`, [studentId]);
-    const userBatchId = userBatchRes.rows[0]?.batch_id;
+    // Get student's batch_id and name from users table
+    const userBatchRes = await pool.query(`SELECT b.id, b.name FROM users u JOIN batches b ON b.id = u.batch_id WHERE u.uid = $1`, [studentId]);
+    const userBatchId = userBatchRes.rows[0]?.id;
+    const batchName = userBatchRes.rows[0]?.name;
 
     const nextDeadline = userBatchId
         ? await pool.query(
@@ -121,6 +122,8 @@ export const getStudentStats = async (studentId: number) => {
         pendingInvitationsCount: pendingInvitations.rows[0]?.count || 0,
         kanbanTasks: taskMap,
         unreadMessages: unreadMessages.rows[0]?.count || 0,
+        batchName: batchName || 'Unassigned Batch',
+        systemStatus: project?.github_repo ? 'Active Sync' : 'Waiting for Repo'
     };
 };
 
@@ -129,14 +132,64 @@ export const getStudentProject = async (studentId: number) => {
     if (!project) return null;
 
     const membersRes = await pool.query(
-        `SELECT u.uid, p.full_name, u.email, gm.is_leader
+        `SELECT u.uid, p.full_name, u.email, gm.is_leader,
+                (SELECT COUNT(*)::int FROM tasks WHERE (assigned_to = u.uid OR (assigned_to IS NULL AND created_by = u.uid)) AND project_id = $2 AND status = 'done') as tasks_done
          FROM group_members gm
          JOIN users u ON u.uid = gm.student_id
          LEFT JOIN profiles p ON p.u_id = u.uid
          WHERE gm.group_id = $1
          ORDER BY gm.is_leader DESC, p.full_name ASC`,
-        [project.group_id]
+        [project.group_id, project.id]
     );
+
+    // Fetch and count commits per member
+    let allCommits: any[] = [];
+    if (project.github_repo) {
+        try {
+            allCommits = await fetchCommits(project.github_repo);
+        } catch (e) {
+            console.error('getStudentProject: GitHub fetch failed');
+        }
+    }
+
+    const members = membersRes.rows.map((member) => {
+        // Simple name matching for commits
+        const name = member.full_name?.toLowerCase() || '';
+        let memberCommits = allCommits.filter(c => 
+            c.author?.toLowerCase().includes(name) || 
+            name.includes(c.author?.toLowerCase())
+        ).length;
+
+        // Fallback: If individual project, attribute all commits to the only member
+        if (membersRes.rows.length === 1) {
+            memberCommits = allCommits.length;
+        }
+
+        return {
+            uid: String(member.uid),
+            full_name: member.full_name || 'Unnamed Student',
+            email: member.email,
+            is_leader: member.is_leader,
+            tasks_done: member.tasks_done || 0,
+            commits_count: memberCommits
+        };
+    });
+
+    // Calculate team activity percentage (tasks done vs total tasks across the project)
+    const totalTasksRes = await pool.query(`SELECT COUNT(*)::int as count FROM tasks WHERE project_id = $1`, [project.id]);
+    const totalTasks = totalTasksRes.rows[0]?.count || 0;
+    
+    // Total done tasks for the whole project
+    const totalDoneRes = await pool.query(`SELECT COUNT(*)::int as count FROM tasks WHERE project_id = $1 AND status = 'done'`, [project.id]);
+    const totalDone = totalDoneRes.rows[0]?.count || 0;
+    
+    const teamActivity = totalTasks > 0 ? Math.round((totalDone / totalTasks) * 100) : 0;
+
+    // Get guide email
+    const guideEmailRes = project.guide_id 
+        ? await pool.query(`SELECT email FROM users WHERE uid = $1`, [project.guide_id])
+        : { rows: [] };
+    const guideEmail = guideEmailRes.rows[0]?.email || 'support@apms.edu';
 
     return {
         id: String(project.id),
@@ -148,16 +201,13 @@ export const getStudentProject = async (studentId: number) => {
         topicFeedback: project.topic_feedback || null,
         createdAt: project.created_at,
         reviewedAt: project.topic_reviewed_at,
-        mode: membersRes.rows.length > 1 ? 'Group' : 'Individual',
+        mode: members.length > 1 ? 'Group' : 'Individual',
         batchName: project.batch_name || 'Unassigned Batch',
         guideName: project.guide_name || null,
-        members: membersRes.rows.map((member) => ({
-            uid: String(member.uid),
-            full_name: member.full_name || 'Unnamed Student',
-            email: member.email,
-            is_leader: member.is_leader,
-        })),
+        guideEmail: guideEmail,
+        members: members,
         github_repo: project.github_repo || undefined,
+        teamActivity: teamActivity
     };
 };
 
@@ -487,7 +537,7 @@ export const createStudentTask = async (
         `INSERT INTO tasks (project_id, title, priority, deadline, assigned_to, created_by)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING *`,
-        [project.id, data.title, data.priority || 'Medium', data.deadline || null, data.assigned_to || null, studentId]
+        [project.id, data.title, data.priority || 'Medium', data.deadline || null, data.assigned_to || studentId, studentId]
     );
     return result.rows[0];
 };

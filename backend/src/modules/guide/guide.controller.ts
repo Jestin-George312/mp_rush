@@ -189,6 +189,19 @@ export const getUpcomingDeadlines = async (req: Request, res: Response) => {
         sendError(res, error.message || 'Could not fetch upcoming deadlines', 500);
     }
 };
+
+export const getBatchDeadlines = async (req: Request, res: Response) => {
+    try {
+        const batchId = parseInt(req.params.batchId as string);
+        if (isNaN(batchId)) return sendError(res, 'Invalid batch id', 400);
+
+        const data = await guideService.getBatchDeadlines(batchId, req.user!.id);
+        sendSuccess(res, data);
+    } catch (error: any) {
+        logger.error('guide.getBatchDeadlines error:', error.message);
+        sendError(res, error.message || 'Could not fetch batch deadlines', 500);
+    }
+};
 export const getExtensionRequests = async (req: Request, res: Response) => {
     try {
         const data = await guideService.getExtensionRequests(req.user!.id);

@@ -55,6 +55,7 @@ export interface UpcomingDeadline {
   batch_name: string;
   total_groups: number;
   submitted_count: number;
+  pending_groups?: string[];
 }
 
 export const guideApi = {
@@ -65,6 +66,7 @@ export const guideApi = {
   // Batches
   getAssignedBatches: () => api.get<BatchSummary[]>('/guide/batches'),
   getBatchGroups: (batchId: string) => api.get<ProjectGroupMeta[]>(`/guide/batches/${batchId}/groups`),
+  getBatchDeadlines: (batchId: string | number) => api.get<UpcomingDeadline[]>(`/guide/batches/${batchId}/deadlines`),
   
   // Topics
   getPendingTopics: () => api.get<TopicProposal[]>('/guide/topics/pending'),
