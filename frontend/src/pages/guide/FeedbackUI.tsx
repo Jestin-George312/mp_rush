@@ -53,24 +53,29 @@ const FeedbackUI: React.FC = () => {
   if (!documentData) return <div className="p-8 text-center text-red-500 font-bold">Document Unavailable</div>;
 
   const BACKEND_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api\/?$/, '');
-  let rawPath: string = documentData.file_path || '';
+  
+  // For the viewer, we prefer the marked file if it exists so the faculty sees their annotations
+  const displayPath = documentData.marked_file_path || documentData.file_path || '';
   let viewerSrc = '';
 
-  if (rawPath.includes('drive.google.com/file/d/')) {
-    // Google Drive → convert to embeddable preview URL
-    viewerSrc = rawPath.replace(/\/view.*$/, '/preview');
-  } else if (rawPath.startsWith('/uploads/') || rawPath.startsWith('uploads/')) {
-    // Local file stored as relative path → prepend backend host
-    const normalized = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+  if (displayPath.includes('drive.google.com/file/d/')) {
+    viewerSrc = displayPath.replace(/\/view.*$/, '/preview');
+  } else if (displayPath.startsWith('/uploads/') || displayPath.startsWith('uploads/')) {
+    const normalized = displayPath.startsWith('/') ? displayPath : `/${displayPath}`;
     viewerSrc = `${BACKEND_URL}${normalized}`;
-  } else if (rawPath.startsWith('http')) {
-    // Already absolute URL
-    viewerSrc = rawPath;
+  } else if (displayPath.startsWith('http')) {
+    viewerSrc = displayPath;
   }
 
-  const downloadUrl = rawPath.startsWith('/uploads/')
-    ? `${BACKEND_URL}${rawPath}`
-    : rawPath;
+  // Links for both versions
+  const getFullUrl = (p: string) => {
+    if (!p) return '';
+    if (p.startsWith('http')) return p;
+    return `${BACKEND_URL}${p.startsWith('/') ? '' : '/'}${p}`;
+  };
+
+  const downloadUrl = getFullUrl(documentData.file_path);
+  const markedDownloadUrl = getFullUrl(documentData.marked_file_path);
 
   return (
     <div className="space-y-6 h-[calc(100vh-8rem)] flex flex-col">
@@ -88,16 +93,21 @@ const FeedbackUI: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-           <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl text-xs font-black flex items-center gap-2 border border-gray-100 dark:border-gray-700 hover:bg-gray-100">
+           <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl text-xs font-black flex items-center gap-2 border border-gray-100 dark:border-gray-700 hover:bg-gray-100 transition-colors">
              <Download size={16} /> DOWNLOAD ORIGINAL
            </a>
+           {documentData.marked_file_path && (
+             <a href={markedDownloadUrl} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-amber-50 dark:bg-amber-900/20 text-amber-600 rounded-xl text-xs font-black flex items-center gap-2 border border-amber-100 dark:border-amber-900/30 hover:bg-amber-100 transition-colors">
+               <Download size={16} /> DOWNLOAD PREVIOUS MARKED VERSION
+             </a>
+           )}
         </div>
       </div>
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-0 overflow-hidden">
         {/* Document Viewer Area */}
         <div className="lg:col-span-3 bg-gray-900 rounded-2xl border border-gray-700 overflow-hidden flex flex-col">
-           {viewerSrc && (viewerSrc.match(/\.pdf/i) || rawPath.match(/\.pdf/i) || (documentData.name || '').match(/\.pdf$/i)) ? (
+           {viewerSrc && (viewerSrc.match(/\.pdf/i) || displayPath.match(/\.pdf/i) || (documentData.name || '').match(/\.pdf$/i)) ? (
                <PDFAnnotationViewer
                  url={viewerSrc}
                  onSaveAnnotated={(file) => setMarkedFile(file)}

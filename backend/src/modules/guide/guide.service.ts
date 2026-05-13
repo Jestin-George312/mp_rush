@@ -325,6 +325,7 @@ export const getPendingDocuments = async (guideId: number, statusFilter: string 
             d.created_at,
             d.reviewed_at,
             d.file_path,
+            d.marked_file_path,
             p.title AS project_title,
             g.group_name,
             b.name AS batch_name,

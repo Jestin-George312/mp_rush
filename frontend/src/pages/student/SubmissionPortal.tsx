@@ -3,7 +3,8 @@ import Card from '../../components/common/UI/Card';
 import Badge from '../../components/common/UI/Badge';
 import { 
   Upload, FileText, CheckCircle2, AlertCircle, 
-  History, ShieldCheck, HelpCircle, MessageSquare, Download, Trash2
+  History, ShieldCheck, HelpCircle, MessageSquare, Download, Trash2,
+  Eye
 } from 'lucide-react';
 import { studentApi } from '../../services/studentApi';
 import { toast } from 'react-hot-toast';
@@ -256,15 +257,25 @@ const SubmissionPortal: React.FC = () => {
                                           <p className="text-xs text-amber-600 dark:text-amber-300 font-semibold mb-3 leading-relaxed">
                                              Your guide has reviewed your document and marked it with annotations and highlights showing the areas that need attention.
                                           </p>
-                                          <a 
-                                             href={item.marked_file_path.startsWith('http') ? item.marked_file_path : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/${item.marked_file_path.replace(/^\//, '')}`}
-                                             target="_blank"
-                                             rel="noopener noreferrer"
-                                             className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-amber-600/30"
-                                             download
-                                          >
-                                             <Download size={16} /> Download Marked Document
-                                          </a>
+                                          <div className="flex flex-wrap gap-3">
+                                             <a 
+                                                href={item.marked_file_path.startsWith('http') ? item.marked_file_path : `${(import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api\/?$/, '')}${item.marked_file_path.startsWith('/') ? '' : '/'}${item.marked_file_path}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-amber-600/30"
+                                                download
+                                             >
+                                                <Download size={16} /> Download Marked Document
+                                             </a>
+                                             <a 
+                                                href={item.marked_file_path.startsWith('http') ? item.marked_file_path : `${(import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api\/?$/, '')}${item.marked_file_path.startsWith('/') ? '' : '/'}${item.marked_file_path}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-gray-800 text-amber-600 border border-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/10 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
+                                             >
+                                                <Eye size={16} /> View in New Tab
+                                             </a>
+                                          </div>
                                        </div>
                                     </div>
                                  </div>
