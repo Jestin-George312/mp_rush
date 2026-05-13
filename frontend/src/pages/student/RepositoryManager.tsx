@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Card from '../../components/common/UI/Card';
 import Input from '../../components/common/UI/Input';
 import Button from '../../components/common/UI/Button';
-import Badge from '../../components/common/UI/Badge';
+
 import { 
   Github, Activity, GitCommit, GitBranch, 
   ExternalLink, Link as LinkIcon, 
@@ -18,6 +18,8 @@ const RepositoryManager: React.FC = () => {
   const [commits, setCommits] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLinking, setIsLinking] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [healthReport, setHealthReport] = useState<any>(null);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -38,6 +40,20 @@ const RepositoryManager: React.FC = () => {
   React.useEffect(() => {
     fetchData();
   }, []);
+
+  const handleFetchHealth = async () => {
+    if (!project?.id) return;
+    setIsAnalyzing(true);
+    setHealthReport(null);
+    try {
+      const res = await studentApi.getGitHealth(project.id);
+      setHealthReport((res.data as any).data || res.data);
+    } catch (err) {
+      toast.error('Failed to generate health analysis');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const handleLinkRepo = async () => {
     // Basic Validation
@@ -164,8 +180,80 @@ const RepositoryManager: React.FC = () => {
             <Card>
                <div className="flex items-center justify-between mb-6">
                   <h3 className="text-xs font-black uppercase tracking-widest text-gray-400">Technical Context</h3>
-                  <Badge variant="secondary" className="font-black">GIT ANALYTICS</Badge>
+                  <button 
+                    onClick={handleFetchHealth}
+                    disabled={isAnalyzing || !project?.github_repo}
+                    className="px-3 py-1 bg-gray-900 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-gray-700 transition-all flex items-center gap-2 disabled:opacity-50"
+                  >
+                     {isAnalyzing ? <Loader2 size={12} className="animate-spin" /> : <Activity size={12} />}
+                     GIT ANALYTICS
+                  </button>
                </div>
+
+               {/* AI Assistance Analysis Report */}
+               {healthReport && (
+                 <div className="mb-6 rounded-2xl overflow-hidden shadow-xl border border-white/10 animate-in slide-in-from-top-4 duration-500">
+                    {/* Header bar */}
+                    <div className={`px-6 py-4 flex items-center justify-between
+                      ${healthReport.aiAssistanceLevel === 'Minimal' ? 'bg-emerald-900' :
+                        healthReport.aiAssistanceLevel === 'Moderate' ? 'bg-blue-900' :
+                        healthReport.aiAssistanceLevel === 'Significant' ? 'bg-orange-900' : 'bg-red-900'}`}>
+                       <div>
+                          <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/50 mb-0.5">AI Assistance Estimation</p>
+                          <h4 className="text-lg font-black text-white flex items-center gap-2">
+                             {healthReport.aiAssistanceLevel}
+                             <span className="text-xs font-bold text-white/60">· {healthReport.confidenceScore}% confidence</span>
+                          </h4>
+                       </div>
+                       <button onClick={() => setHealthReport(null)} className="text-white/40 hover:text-white transition-colors">
+                          <AlertCircle size={18} />
+                       </button>
+                    </div>
+
+                    <div className="bg-gray-900 p-6 space-y-5">
+                       {/* Technical Reasons */}
+                       <div>
+                          <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-2">Technical Assessment</p>
+                          <p className="text-xs text-gray-300 leading-relaxed font-medium">{healthReport.technicalReasons}</p>
+                       </div>
+
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Human Indicators */}
+                          <div>
+                             <p className="text-[9px] font-black text-green-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                               <CheckCircle2 size={11} /> Human-Driven Indicators
+                             </p>
+                             <ul className="space-y-1.5">
+                               {healthReport.humanDrivenIndicators?.map((ind: string, i: number) => (
+                                 <li key={i} className="flex items-start gap-2 text-[10px] text-gray-400 font-medium bg-green-900/20 border border-green-900/30 px-3 py-2 rounded-lg">
+                                   <span className="text-green-500 flex-shrink-0 mt-0.5">↑</span> {ind}
+                                 </li>
+                               ))}
+                             </ul>
+                          </div>
+
+                          {/* AI Indicators */}
+                          <div>
+                             <p className="text-[9px] font-black text-orange-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                               <Activity size={11} /> AI-Assisted Indicators
+                             </p>
+                             <ul className="space-y-1.5">
+                               {healthReport.aiAssistedIndicators?.map((ind: string, i: number) => (
+                                 <li key={i} className="flex items-start gap-2 text-[10px] text-gray-400 font-medium bg-orange-900/20 border border-orange-900/30 px-3 py-2 rounded-lg">
+                                   <span className="text-orange-400 flex-shrink-0 mt-0.5">◆</span> {ind}
+                                 </li>
+                               ))}
+                             </ul>
+                          </div>
+                       </div>
+
+                       <p className="text-[9px] text-gray-600 font-medium italic border-t border-white/5 pt-4">
+                          ⚠ This is a probabilistic estimate based on commit patterns only. It does not constitute evidence of academic misconduct.
+                       </p>
+                    </div>
+                 </div>
+               )}
+
                 <div className="space-y-4">
                   {commits.length > 0 ? commits.map((commit, i) => (
                     <div key={i} className="flex items-center justify-between p-3 border border-gray-100 dark:border-gray-700 rounded-xl hover:bg-gray-50 transition-colors group">

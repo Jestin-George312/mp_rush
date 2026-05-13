@@ -106,5 +106,6 @@ export const studentApi = {
   // GitHub
   linkRepository: (repoUrl: string) => api.post('/student/project/github', { repoUrl }),
   getGitCommits: () => api.get<any[]>('/student/project/git/commits'),
+  getGitHealth: (projectId: number | string) => api.get<any>(`/github/project/${projectId}/health`),
   getBatchSettings: () => api.get<any>('/student/batch-settings'),
 };

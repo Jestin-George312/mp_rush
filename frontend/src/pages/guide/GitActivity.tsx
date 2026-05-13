@@ -105,10 +105,10 @@ const GitActivity: React.FC = () => {
                  )}
 
                  <button 
-                  onClick={() => navigate(`/guide/fork-analysis/${group.projectId}`)}
-                  className="w-full py-3 bg-gray-50 dark:bg-gray-800 text-xs font-black text-gray-700 dark:text-gray-200 rounded-xl hover:bg-gray-100 transition-all flex items-center justify-center gap-2 border border-gray-100 dark:border-gray-700"
+                  onClick={() => navigate(`/guide/commit-activity/${group.projectId}`)}
+                  className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-black rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20"
                  >
-                    <ExternalLink size={16} /> FORK-LEVEL ANALYSIS ON GITHUB
+                    <GitCommit size={16} /> VIEW COMMIT ACTIVITY
                  </button>
               </div>
            </Card>

@@ -41,6 +41,34 @@ export const fetchCommits = async (repoUrl: string) => {
     }
 };
 
+export const getCommitDetails = async (repoUrl: string, sha: string) => {
+    try {
+        let cleaned = repoUrl.replace('https://github.com/', '').replace('http://github.com/', '');
+        cleaned = cleaned.replace(/\.git$/, '').replace(/\/$/, '');
+        const parts = cleaned.split('/');
+        const owner = parts[0];
+        const repo = parts[1];
+
+        const response = await axios.get(`${GITHUB_API_BASE}/repos/${owner}/${repo}/commits/${sha}`, {
+            headers: {
+                Authorization: `token ${process.env.GITHUB_TOKEN}`,
+                Accept: 'application/vnd.github.v3+json',
+            }
+        });
+
+        return response.data.files.map((f: any) => ({
+            filename: f.filename,
+            patch: f.patch || '(No patch available - possibly a binary file or too large)',
+            status: f.status,
+            additions: f.additions,
+            deletions: f.deletions
+        }));
+    } catch (error: any) {
+        console.error('GitHub Detail API error:', error.response?.data || error.message);
+        throw new Error('Could not fetch commit details');
+    }
+};
+
 export const linkRepository = async (projectId: number, repoUrl: string) => {
     const result = await pool.query(
         `UPDATE projects SET github_repo = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,

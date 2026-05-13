@@ -103,4 +103,13 @@ export const guideApi = {
   
   // Kanban Oversight
   getGroupKanban: (groupId: string) => api.get<any>(`/guide/groups/${groupId}/kanban`),
+
+  // Commit Activity (guide view by project)
+  getProjectCommits: (projectId: string | number) => api.get<any>(`/github/project/${projectId}/commits`),
+  summarizeCommit: (projectId: string | number, data: {
+    commitSha: string;
+    commitMessage: string;
+    commitAuthor: string;
+    commitDate: string;
+  }) => api.post<any>(`/github/project/${projectId}/summarize-commit`, data),
 };

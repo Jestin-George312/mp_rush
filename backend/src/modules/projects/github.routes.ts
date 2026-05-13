@@ -11,6 +11,11 @@ router.post('/webhook', githubController.handleWebhook);
 router.post('/link', requireAuth, githubController.linkRepo);
 router.get('/commits', requireAuth, githubController.getCommits);
 
+// Guide-accessible routes (by projectId)
+router.get('/project/:projectId/commits', requireAuth, githubController.getCommitsByProject);
+router.post('/project/:projectId/summarize-commit', requireAuth, githubController.summarizeCommit);
+router.get('/project/:projectId/health', requireAuth, githubController.getHealthAnalysis);
+
 // Analysis for guides
 router.get('/analyze/:projectId', requireAuth, githubController.analyzeFork);
 
