@@ -2,6 +2,7 @@ import pool from '../../config/db';
 import * as notificationService from '../notifications/notification.service';
 import { UPLOAD_URL_PREFIX, UPLOAD_DIR } from '../../config/storage';
 import { uploadToDrive } from '../../services/googleDrive.service';
+import { fetchCommits } from '../projects/github.service';
 import path from 'path';
 
 const getStudentGroup = async (studentId: number) => {
@@ -142,6 +143,7 @@ export const getStudentProject = async (studentId: number) => {
         groupId: project.group_id,
         title: project.title || 'Untitled Project',
         description: project.description || '',
+        domain: project.domain || null,
         status: project.review_state || 'Pending',
         topicFeedback: project.topic_feedback || null,
         createdAt: project.created_at,
@@ -343,7 +345,7 @@ export const getStudentSubmissions = async (studentId: number) => {
     if (!project?.id) return [];
 
     const result = await pool.query(
-        `SELECT d.*, dl.title AS deadline_title, dl.due_date
+        `SELECT d.id, d.name, d.type, d.status, d.feedback, d.marked_file_path, d.file_path, d.created_at, dl.title AS deadline_title, dl.due_date
          FROM documents d
          LEFT JOIN deadlines dl ON dl.id = d.deadline_id
          WHERE d.project_id = $1
@@ -390,7 +392,9 @@ export const getStudentFeedback = async (studentId: number) => {
             deadline: doc.deadline_title || 'General Submission',
             guide: doc.reviewer_name || project.guide_name || 'Assigned Guide',
             date: doc.reviewed_at ? new Date(doc.reviewed_at).toISOString().split('T')[0] : new Date(doc.created_at).toISOString().split('T')[0],
-            status: doc.status === 'Approved' ? 'Approved' : (doc.status === 'Rejected' ? 'Action Required' : 'Pending'),
+            status: doc.status === 'Approved' ? 'Approved' : (doc.status === 'Rejected' || doc.status === 'Needs Revision' ? 'Action Required' : 'Pending'),
+            file_path: doc.file_path,
+            marked_file_path: doc.marked_file_path || null,
             comments: doc.feedback ? [{ text: doc.feedback, time: 'Latest Review' }] : []
         });
     }
@@ -398,9 +402,23 @@ export const getStudentFeedback = async (studentId: number) => {
     return feedback;
 };
 
+export const deleteStudentSubmission = async (studentId: number, docId: number) => {
+    // Ensure the document belongs to the student's project
+    const project = await getStudentProjectRow(studentId);
+    if (!project?.id) throw new Error('Project not found for student');
+
+    const result = await pool.query(
+        `DELETE FROM documents WHERE id = $1 AND project_id = $2 AND uploaded_by = $3 RETURNING *`,
+        [docId, project.id, studentId]
+    );
+    if (result.rowCount === 0) {
+        throw new Error('Document not found or you do not have permission to delete it');
+    }
+    return result.rows[0];
+};
 export const createStudentSubmission = async (
     studentId: number,
-    data: { deadlineId?: number | null; filename: string; originalname: string }
+    data: { deadlineId?: number | null; filename: string; originalname: string; documentName: string }
 ) => {
     const project = await getStudentProjectRow(studentId);
     if (!project?.id) throw new Error('Project not found for student');
@@ -427,13 +445,20 @@ export const createStudentSubmission = async (
         console.error('Drive upload failed, continuing with local only:', error.message);
     }
 
-    const result = await pool.query(
-        `INSERT INTO documents (project_id, uploaded_by, name, file_path, type, status, deadline_id, drive_file_id, drive_link)
-         VALUES ($1, $2, $3, $4, 'Other', 'Pending', $5, $6, $7)
-         RETURNING *`,
-        [project.id, studentId, data.originalname, fileUrl, data.deadlineId || null, driveData.id, driveData.link]
-    );
-    return result.rows[0];
+    try {
+        const result = await pool.query(
+            `INSERT INTO documents (project_id, uploaded_by, name, file_path, type, status, deadline_id, drive_file_id, drive_link)
+             VALUES ($1, $2, $3, $4, 'Other', 'Pending', $5, $6, $7)
+             RETURNING *`,
+            [project.id, studentId, data.documentName || data.originalname, fileUrl, data.deadlineId || null, driveData.id, driveData.link]
+        );
+        return result.rows[0];
+    } catch (err: any) {
+        if (err.code === '23505') {
+            throw new Error(`A document with the name "${data.documentName}" already exists in your project.`);
+        }
+        throw err;
+    }
 };
 
 export const getStudentTasks = async (studentId: number) => {
@@ -508,15 +533,13 @@ export const getStudentGitCommits = async (studentId: number) => {
     const project = await getStudentProjectRow(studentId);
     if (!project?.id || !project.github_repo) return [];
 
-    return [
-        {
-            id: `${project.id}-1`,
-            message: 'Initial repository sync',
-            author: 'APMS Mock Tracker',
-            date: project.updated_at || project.created_at,
-            repoUrl: project.github_repo,
-        },
-    ];
+    try {
+        const commits = await fetchCommits(project.github_repo);
+        return commits;
+    } catch (err: any) {
+        console.error('getStudentGitCommits: GitHub fetch failed:', err.message);
+        return [];
+    }
 };
 
 // ── Get pending invitations ──────────────────────────────────
@@ -665,3 +688,4 @@ export const getBatchSettings = async (studentId: number) => {
     );
     return res.rows[0] || null;
 };
+

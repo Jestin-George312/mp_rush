@@ -176,7 +176,7 @@ const RepositoryManager: React.FC = () => {
                             <span className="text-[9px] text-gray-400 uppercase font-bold">{commit.author} • {new Date(commit.date).toLocaleDateString()}</span>
                           </div>
                        </div>
-                       <a href={commit.repoUrl} target="_blank" rel="noreferrer">
+                       <a href={commit.url || commit.repoUrl} target="_blank" rel="noreferrer">
                           <ExternalLink size={14} className="text-gray-300 hover:text-blue-500" />
                        </a>
                     </div>

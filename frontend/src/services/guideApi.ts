@@ -78,9 +78,16 @@ export const guideApi = {
   getGroupDetails: (groupId: string) => api.get<any>(`/guide/groups/${groupId}`),
   
   // Submissions & Review
-  getPendingDocuments: () => api.get<any[]>('/guide/documents/pending'),
-  reviewDocument: (docId: string, status: 'Approved' | 'Rejected', feedback: string) => 
-    api.post(`/guide/documents/${docId}/review`, { status, feedback }),
+  getPendingDocuments: (status?: string) => api.get<any[]>(`/guide/documents/pending${status ? `?status=${status}` : ''}`),
+  reviewDocument: (docId: string, status: 'Approved' | 'Rejected' | 'Needs Revision', feedback: string, file?: File) => {
+    const formData = new FormData();
+    formData.append('status', status);
+    formData.append('feedback', feedback);
+    if (file) formData.append('file', file);
+    return api.post(`/guide/documents/${docId}/review`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
     
   // Project Completion
   markProjectCompleted: (id: number) => api.post(`/guide/projects/${id}/complete`),

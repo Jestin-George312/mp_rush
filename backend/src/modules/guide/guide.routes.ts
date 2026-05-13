@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../../middleware/auth.middleware';
 import { requireRoles } from '../../middleware/role.middleware';
+import { upload } from '../../middleware/upload.middleware';
 import {
     approveTopic,
     getBatchGroups,
@@ -38,7 +39,7 @@ router.get('/groups', getGroups);
 router.get('/groups/:groupId', getGroupDetails);
 router.post('/projects/:id/complete', markProjectCompleted);
 router.get('/documents/pending', getPendingDocuments);
-router.post('/documents/:docId/review', reviewDocument);
+router.post('/documents/:docId/review', upload.single('file'), reviewDocument);
 router.get('/git-monitoring', getGitMonitoring);
 router.get('/groups/:groupId/kanban', getGroupKanban);
 router.get('/deadlines/upcoming', getUpcomingDeadlines);

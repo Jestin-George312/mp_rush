@@ -1,29 +1,31 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Card from '../../components/common/UI/Card';
 import { 
   Users, Mail, Shield,
   MessageSquare, Video,
   Activity, Star, Loader2
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { studentApi } from '../../services/studentApi';
 import type { StudentProject } from '../../services/studentApi';
 
 const TeamView: React.FC = () => {
-  const [project, setProject] = React.useState<StudentProject | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const navigate = useNavigate();
+  const [project, setProject] = useState<StudentProject | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  React.useEffect(() => {
-    const fetchProject = async () => {
+  useEffect(() => {
+    const fetchData = async () => {
       try {
-        const res = await studentApi.getProjectDetails();
-        setProject((res.data as any).data || res.data);
+        const projRes = await studentApi.getProjectDetails();
+        setProject((projRes.data as any).data || projRes.data);
       } catch (err) {
         console.error('Fetch team error:', err);
       } finally {
         setIsLoading(false);
       }
     };
-    fetchProject();
+    fetchData();
   }, []);
 
   if (isLoading) {
@@ -34,97 +36,178 @@ const TeamView: React.FC = () => {
     );
   }
 
-  const team = {
-    name: project?.title || 'No Project Linked',
-    mode: project?.mode || 'N/A',
-    guide: project?.guideName || 'No Guide Assigned',
-    members: (project?.members || []).map(m => ({
-      name: m.full_name,
-      role: m.is_leader ? 'Group Leader' : 'Collaborator',
-      email: m.email,
-      commits: 0,
-      tasks: 0
-    }))
-  };
+  const teamMembers = (project?.members || []).map(m => ({
+    uid: m.uid,
+    name: m.full_name,
+    role: m.is_leader ? 'Group Leader' : 'Collaborator',
+    email: m.email,
+    commits: 0,
+    tasks: 0
+  }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-           <h1 className="text-2xl font-black tracking-tight text-gray-800 dark:text-white">Collaboration Identity</h1>
-           <p className="text-gray-500">Managing project entities and team participation metrics</p>
+           <h1 className="text-3xl font-black tracking-tight text-gray-800 dark:text-white">Collaboration Identity</h1>
+           <p className="text-gray-500 font-medium">Managing project entities and team participation metrics</p>
         </div>
-        <div className="flex bg-blue-600 text-white px-6 py-2 rounded-2xl shadow-xl shadow-blue-500/10 items-center gap-2">
-           <Users size={20} />
-           <span className="text-xs font-black uppercase tracking-widest">{team.name}</span>
+        <div className="flex items-center gap-3 flex-wrap">
+           <div className="flex bg-blue-600 text-white px-6 py-3 rounded-2xl shadow-xl shadow-blue-500/20 items-center gap-3">
+              <Users size={20} />
+              <span className="text-xs font-black uppercase tracking-widest">{project?.title || 'No Active Project'}</span>
+           </div>
+           {project?.mode && (
+             <span className={`text-[10px] font-black uppercase tracking-widest px-4 py-3 rounded-2xl shadow-sm ${
+               project.mode === 'Group' 
+                 ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' 
+                 : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+             }`}>
+               {project.mode} Project
+             </span>
+           )}
+           {project?.domain && (
+             <span className="text-[10px] font-black uppercase tracking-widest px-4 py-3 rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 shadow-sm">
+               {project.domain}
+             </span>
+           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
          {/* Team Members List */}
-         <div className="lg:col-span-3 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               {team.members.map((member, i) => (
-                 <Card key={i} className={`relative overflow-hidden ${member.role === 'Group Leader' ? 'border-2 border-blue-500 shadow-xl shadow-blue-500/5' : ''}`}>
-                    {member.role === 'Group Leader' && (
-                       <div className="absolute top-0 right-0 p-3">
-                          <Star size={18} className="text-blue-500 fill-blue-500" />
+         <div className="lg:col-span-3 space-y-8">
+            <div>
+               <h2 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 mb-6 flex items-center gap-2">
+                  <Star size={14} className="text-amber-500 fill-amber-500" />
+                  Active Project Members
+               </h2>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {teamMembers.length > 0 ? teamMembers.map((member, i) => (
+                    <Card key={i} className={`relative overflow-hidden group transition-all hover:scale-[1.02] ${member.role === 'Group Leader' ? 'border-2 border-blue-500 shadow-xl shadow-blue-500/5' : ''}`}>
+                       {member.role === 'Group Leader' && (
+                          <div className="absolute top-0 right-0 p-4">
+                             <div className="bg-amber-100 text-amber-600 p-1.5 rounded-full shadow-sm">
+                                <Star size={16} className="fill-amber-600" />
+                             </div>
+                          </div>
+                       )}
+                       <div className="flex flex-col h-full space-y-6">
+                          <div className="flex items-center gap-5">
+                             <div className="w-16 h-16 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 rounded-2xl flex items-center justify-center font-black text-2xl text-blue-600 shadow-sm border border-blue-100/50 dark:border-gray-600">
+                                {member.name[0]}
+                             </div>
+                             <div>
+                                <h3 className="text-xl font-black text-gray-800 dark:text-white">{member.name}</h3>
+                                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mt-1">{member.role}</p>
+                             </div>
+                          </div>
+   
+                          <div className="grid grid-cols-2 gap-4 pt-6 border-t border-gray-100 dark:border-gray-700">
+                             <div>
+                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Git Commits</p>
+                                <p className="text-xl font-black">{member.commits}</p>
+                             </div>
+                             <div>
+                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Tasks Resolved</p>
+                                <p className="text-xl font-black">{member.tasks}</p>
+                             </div>
+                          </div>
+   
+                          <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-2xl flex items-center justify-between mt-auto group-hover:bg-blue-50 dark:group-hover:bg-blue-900/10 transition-colors">
+                             <div className="flex items-center gap-2">
+                                <Mail size={14} className="text-gray-400" />
+                                <span className="text-[10px] font-bold text-gray-500 truncate max-w-[120px]">{member.email}</span>
+                             </div>
+                             <button 
+                               onClick={() => navigate('/student/chat')}
+                               className="p-2 bg-white dark:bg-gray-800 text-blue-500 hover:text-white hover:bg-blue-500 rounded-xl transition-all shadow-sm"
+                             >
+                                <MessageSquare size={18} />
+                             </button>
+                          </div>
                        </div>
-                    )}
-                    <div className="flex flex-col h-full space-y-6">
-                       <div className="flex items-center gap-4">
-                          <div className="w-14 h-14 bg-gray-100 dark:bg-gray-800 rounded-2xl flex items-center justify-center font-black text-xl text-blue-600 shadow-sm border border-gray-100 dark:border-gray-700">
-                             {member.name[0]}
-                          </div>
-                          <div>
-                             <h3 className="text-lg font-black">{member.name}</h3>
-                             <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{member.role}</p>
-                          </div>
+                    </Card>
+                  )) : (
+                    <Card className="md:col-span-2 py-12 text-center border-dashed border-2">
+                       <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-full w-fit mx-auto mb-4">
+                          <Users size={32} className="text-gray-300" />
                        </div>
-
-                       <div className="grid grid-cols-2 gap-4 pt-6 border-t border-gray-50 dark:border-gray-700">
-                          <div>
-                             <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Git Commits</p>
-                             <p className="text-xl font-black">{member.commits}</p>
-                          </div>
-                          <div>
-                             <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Tasks Resolved</p>
-                             <p className="text-xl font-black">{member.tasks}</p>
-                          </div>
-                       </div>
-
-                       <div className="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl flex items-center justify-between mt-auto">
-                          <div className="flex items-center gap-2">
-                             <Mail size={14} className="text-gray-400" />
-                             <span className="text-[10px] font-bold text-gray-500">{member.email}</span>
-                          </div>
-                          <button className="text-blue-500 hover:text-blue-600">
-                             <MessageSquare size={16} />
-                          </button>
-                       </div>
-                    </div>
-                 </Card>
-               ))}
-            </div>
-            
-            <Card className="bg-gradient-to-r from-gray-900 to-gray-800 text-white flex items-center justify-between p-8 border-none shadow-2xl overflow-hidden relative">
-               <div className="relative z-10">
-                  <h4 className="text-lg font-black tracking-tight">Technical Supervisor</h4>
-                  <p className="text-xs text-blue-400 font-bold uppercase tracking-widest mt-1">{team.guide}</p>
-                  <div className="flex gap-4 mt-6">
-                     <button className="p-3 bg-white/10 rounded-xl hover:bg-white/20 transition-all"><Mail size={18} /></button>
-                     <button className="p-3 bg-white/10 rounded-xl hover:bg-white/20 transition-all"><Video size={18} /></button>
-                     <button className="px-6 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20">SCHEDULE REVIEW</button>
-                  </div>
+                       <p className="text-sm font-bold text-gray-500">No team members found. Start by setting up your project.</p>
+                       <button 
+                        onClick={() => navigate('/student/setup')}
+                        className="mt-6 px-6 py-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-all"
+                       >
+                          SETUP PROJECT
+                       </button>
+                    </Card>
+                  )}
                </div>
-               <Shield size={160} className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-12 opacity-5 -rotate-12" />
-            </Card>
+            </div>
          </div>
 
-         {/* Entity Stats - Removed as requested */}
+         {/* Sidebar Stats */}
+         <div className="space-y-6">
+            <Card className="bg-gradient-to-br from-gray-900 to-indigo-900 text-white border-none shadow-2xl relative overflow-hidden">
+               <div className="relative z-10 p-2">
+                  <h4 className="text-lg font-black tracking-tight">Technical Supervisor</h4>
+                  <p className="text-xs text-blue-400 font-bold uppercase tracking-widest mt-1">
+                     {project?.guideName || 'Unassigned Guide'}
+                  </p>
+                  
+                  <div className="mt-8 space-y-4">
+                     <div className="flex items-center gap-3 p-3 bg-white/10 rounded-2xl border border-white/10">
+                        <div className="p-2 bg-blue-600 rounded-xl">
+                           <Mail size={16} />
+                        </div>
+                        <div className="overflow-hidden">
+                           <p className="text-[10px] font-black uppercase text-gray-400">Email Guide</p>
+                           <p className="text-xs font-bold truncate">support@apms.edu</p>
+                        </div>
+                     </div>
+                     
+                     <div className="flex gap-3">
+                        <button className="flex-1 py-3 bg-white/10 rounded-2xl hover:bg-white/20 transition-all flex items-center justify-center gap-2">
+                           <Video size={16} />
+                           <span className="text-[10px] font-black uppercase tracking-widest">Call</span>
+                        </button>
+                        <button className="flex-1 py-3 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20">
+                           Schedule
+                        </button>
+                     </div>
+                  </div>
+               </div>
+               <Shield size={160} className="absolute right-0 bottom-0 translate-y-12 translate-x-12 opacity-10 -rotate-12" />
+            </Card>
+            
+            <Card className="border-t-4 border-t-indigo-500">
+               <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6">Group Metadata</h4>
+               <div className="space-y-6">
+                  <div>
+                     <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Collaboration Mode</p>
+                     <p className="text-sm font-black">{project?.mode || 'Phase 1 - Initial'}</p>
+                  </div>
+                  <div>
+                     <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Associated Batch</p>
+                     <p className="text-sm font-black text-indigo-600">{project?.batchName || 'N/A'}</p>
+                  </div>
+                  <div className="pt-6 border-t border-gray-100 dark:border-gray-700">
+                     <div className="flex items-center justify-between mb-2">
+                        <p className="text-[9px] font-black text-gray-400 uppercase">Team Activity</p>
+                        <span className="text-[10px] font-black text-indigo-500">78%</span>
+                     </div>
+                     <div className="h-2 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                        <div className="h-full bg-indigo-500 rounded-full w-[78%]"></div>
+                     </div>
+                  </div>
+               </div>
+            </Card>
+         </div>
       </div>
     </div>
   );
 };
 
 export default TeamView;
+

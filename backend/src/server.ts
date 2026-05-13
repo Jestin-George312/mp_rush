@@ -45,8 +45,12 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Serve static files (uploaded documents/images)
-app.use(UPLOAD_URL_PREFIX, express.static(UPLOAD_DIR));
+// Serve uploaded files with CORS so the frontend PDF viewer can fetch them
+app.use(UPLOAD_URL_PREFIX, (req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET');
+    next();
+}, express.static(UPLOAD_DIR));
 
 // Register Routes
 app.use('/api/auth', authRoutes);

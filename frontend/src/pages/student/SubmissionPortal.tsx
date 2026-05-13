@@ -3,7 +3,7 @@ import Card from '../../components/common/UI/Card';
 import Badge from '../../components/common/UI/Badge';
 import { 
   Upload, FileText, CheckCircle2, AlertCircle, 
-  History, ShieldCheck, HelpCircle
+  History, ShieldCheck, HelpCircle, MessageSquare, Download, Trash2
 } from 'lucide-react';
 import { studentApi } from '../../services/studentApi';
 import { toast } from 'react-hot-toast';
@@ -13,8 +13,11 @@ const SubmissionPortal: React.FC = () => {
   const [deadlines, setDeadlines] = useState<any[]>([]);
   const [selectedDeadline, setSelectedDeadline] = useState<string>('');
   const [history, setHistory] = useState<any[]>([]);
+  const [docName, setDocName] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
   React.useEffect(() => {
     const fetchData = async () => {
@@ -39,23 +42,25 @@ const SubmissionPortal: React.FC = () => {
     fetchData();
   }, []);
 
-  const handleFileUpload = async (file: File) => {
-    if (!selectedDeadline) return toast.error('Please select a deadline');
+  const handleSubmit = async () => {
+    if (!selectedFile) return toast.error('Please select a file to upload');
+    if (!docName.trim()) return toast.error('Please provide a unique name for this document');
     
     setUploading(true);
     try {
-        // Need to find project_id. We can get it from dashboard stats or just assuming the backend handles user-scoped project.
-        // Actually studentApi.getProjectDetails() has the ID.
         const projRes = await studentApi.getProjectDetails();
         const project = (projRes.data as any).data || projRes.data;
         
         await studentApi.submitDocument({
             project_id: project.id,
+            deadlineId: selectedDeadline,
+            documentName: docName.trim(),
             type: deadlines.find(d => String(d.id) === selectedDeadline)?.phase || 'Other',
-            parent_doc_id: undefined // Add logic for versions if needed
-        }, file);
+        }, selectedFile);
         
         toast.success('File uploaded successfully!');
+        setDocName(''); // Clear name after success
+        setSelectedFile(null); // Clear file after success
         // Refresh history
         const historyRes = await studentApi.getSubmissionStatus();
         setHistory((historyRes.data as any).data || historyRes.data);
@@ -91,11 +96,24 @@ const SubmissionPortal: React.FC = () => {
                         onChange={(e) => setSelectedDeadline(e.target.value)}
                         className="w-full mt-2 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl px-4 py-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/20"
                      >
+                        <option value="">Informal Draft for Guide Review</option>
                         {deadlines.map(d => (
                           <option key={d.id} value={d.id}>{d.title} ({d.status})</option>
                         ))}
                      </select>
                   </div>
+
+                  <div>
+                      <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Document Identification Name</label>
+                      <input 
+                         type="text"
+                         value={docName}
+                         onChange={(e) => setDocName(e.target.value)}
+                         placeholder="e.g., Final System Architecture v1"
+                         className="w-full mt-2 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl px-4 py-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/20"
+                      />
+                      <p className="text-[9px] font-bold text-gray-400 mt-2">This name must be unique within your project group.</p>
+                   </div>
 
                    {deadlines.find(d => String(d.id) === selectedDeadline)?.phase === 'Proposal' ? (
                       <div className="p-12 bg-blue-50/50 dark:bg-blue-900/10 border-2 border-dashed border-blue-200 dark:border-blue-800 rounded-3xl text-center">
@@ -114,7 +132,7 @@ const SubmissionPortal: React.FC = () => {
                         onDrop={(e) => { 
                            e.preventDefault(); 
                            setDragActive(false); 
-                           if (e.dataTransfer.files[0]) handleFileUpload(e.dataTransfer.files[0]);
+                           if (e.dataTransfer.files[0]) setSelectedFile(e.dataTransfer.files[0]);
                         }}
                         className={`relative border-2 border-dashed rounded-3xl p-12 text-center transition-all ${
                            dragActive ? 'border-blue-500 bg-blue-50/50 scale-[1.01]' : 'border-gray-200 dark:border-gray-700 hover:border-blue-400'
@@ -125,22 +143,32 @@ const SubmissionPortal: React.FC = () => {
                                <Upload size={32} />
                             </div>
                             <h4 className="text-lg font-black tracking-tight">
-                               {uploading ? 'Uploading...' : 'Drop your artifact here'}
+                               {selectedFile ? selectedFile.name : 'Drop your artifact here'}
                             </h4>
                             <p className="text-xs text-gray-500 mt-2 font-medium">Standard PDF or ZIP formats only. Maximum file size 25MB.</p>
                             <input 
                                type="file" 
                                id="file-upload" 
                                className="hidden" 
-                               onChange={(e) => e.target.files && handleFileUpload(e.target.files[0])}
+                               onChange={(e) => e.target.files && setSelectedFile(e.target.files[0])}
                             />
-                            <button 
-                               type="button"
-                               onClick={() => document.getElementById('file-upload')?.click()}
-                               className="mt-8 px-8 py-3 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-xl shadow-blue-500/20 hover:scale-105 transition-all"
-                            >
-                               BROWSE LOCAL FILES
-                            </button>
+                            <div className="flex gap-4 mt-8">
+                                <button 
+                                   type="button"
+                                   onClick={() => document.getElementById('file-upload')?.click()}
+                                   className="px-6 py-3 bg-gray-200 text-gray-800 dark:bg-gray-800 dark:text-gray-200 rounded-xl text-xs font-black uppercase tracking-widest hover:scale-105 transition-all"
+                                >
+                                   {selectedFile ? 'CHANGE FILE' : 'BROWSE LOCAL FILES'}
+                                </button>
+                                <button 
+                                   type="button"
+                                   onClick={handleSubmit}
+                                   disabled={uploading || !selectedFile}
+                                   className="px-8 py-3 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-xl shadow-blue-500/20 hover:scale-105 transition-all disabled:opacity-50"
+                                >
+                                   {uploading ? 'UPLOADING...' : 'SUBMIT ARTIFACT'}
+                                </button>
+                            </div>
                          </div>
                       </div>
                    )}
@@ -160,20 +188,109 @@ const SubmissionPortal: React.FC = () => {
                </h3>
                <div className="space-y-3">
                   {history.length > 0 ? history.map(item => (
-                    <div key={item.id} className="p-4 border border-gray-100 dark:border-gray-700 rounded-2xl flex items-center justify-between group hover:bg-gray-50 transition-colors">
-                       <div className="flex items-center gap-4">
-                          <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-xl group-hover:bg-white transition-colors shadow-sm">
-                             <FileText size={20} className="text-gray-400" />
-                          </div>
-                          <div>
-                             <p className="text-sm font-black text-gray-800 dark:text-gray-100">{item.name}</p>
-                             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">
-                                {item.type} • Received {new Date(item.created_at).toLocaleDateString()}
-                             </p>
-                          </div>
-                       </div>
-                       <Badge variant={item.status === 'Approved' ? 'success' : 'warning'} className="text-[9px] font-black">{item.status}</Badge>
-                    </div>
+                     <div key={item.id} className="flex flex-col border border-gray-100 dark:border-gray-700 rounded-2xl overflow-hidden group transition-all">
+                        <div 
+                           className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors"
+                           onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                        >
+                           <div className="flex items-center gap-4">
+                              <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-xl group-hover:bg-white transition-colors shadow-sm">
+                                 <FileText size={20} className="text-gray-400" />
+                              </div>
+                              <div>
+                                 <p className="text-sm font-black text-gray-800 dark:text-gray-100">{item.name}</p>
+                                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">
+                                    {item.type} • Received {new Date(item.created_at).toLocaleDateString()}
+                                 </p>
+                              </div>
+                           </div>
+                           <div className="flex items-center gap-3 flex-wrap">
+                              <Badge variant={item.status === 'Approved' ? 'success' : item.status === 'Needs Revision' ? 'info' : 'warning'} className="text-[9px] font-black">
+                                 {item.status}
+                              </Badge>
+                              {item.marked_file_path && (
+                                 <Badge variant="success" className="text-[9px] font-black uppercase px-2 py-1">
+                                    Marked Review
+                                 </Badge>
+                              )}
+                              {(item.feedback || item.marked_file_path) && (
+                                 <div className={`p-1 rounded-full ${expandedId === item.id ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
+                                    <AlertCircle size={14} />
+                                 </div>
+                              )}
+                              <button
+                                 type="button"
+                                 title="Delete submission"
+                                 onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (!window.confirm('Are you sure you want to delete this submission? This cannot be undone.')) return;
+                                    try {
+                                       await studentApi.deleteSubmission(item.id);
+                                       toast.success('Submission deleted');
+                                       const refreshed = await studentApi.getSubmissionStatus();
+                                       setHistory((refreshed.data as any).data || refreshed.data);
+                                    } catch (err: any) {
+                                       toast.error(err.response?.data?.message || 'Delete failed');
+                                    }
+                                 }}
+                                 className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                              >
+                                 <Trash2 size={14} />
+                              </button>
+                           </div>
+                        </div>
+                        
+                        {expandedId === item.id && (item.feedback || item.marked_file_path) && (
+                           <div className="border-t border-gray-100 dark:border-gray-700">
+                              {/* Marked Document Section (if available) */}
+                              {item.marked_file_path && (
+                                 <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 border-b border-amber-100 dark:border-amber-900/30">
+                                    <div className="flex items-start gap-3">
+                                       <div className="p-2.5 bg-amber-100 dark:bg-amber-900/40 rounded-lg mt-0.5">
+                                          <FileText size={16} className="text-amber-600" />
+                                       </div>
+                                       <div className="flex-1">
+                                          <p className="text-[10px] font-black uppercase text-amber-700 dark:text-amber-400 tracking-wider mb-2 flex items-center gap-1">
+                                             ✓ Marked Document Available
+                                          </p>
+                                          <p className="text-xs text-amber-600 dark:text-amber-300 font-semibold mb-3 leading-relaxed">
+                                             Your guide has reviewed your document and marked it with annotations and highlights showing the areas that need attention.
+                                          </p>
+                                          <a 
+                                             href={item.marked_file_path.startsWith('http') ? item.marked_file_path : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/${item.marked_file_path.replace(/^\//, '')}`}
+                                             target="_blank"
+                                             rel="noopener noreferrer"
+                                             className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-amber-600/30"
+                                             download
+                                          >
+                                             <Download size={16} /> Download Marked Document
+                                          </a>
+                                       </div>
+                                    </div>
+                                 </div>
+                              )}
+                              
+                              {/* Feedback Message Section */}
+                              {item.feedback && (
+                                 <div className="p-4 bg-blue-50/40 dark:bg-blue-900/15">
+                                    <div className="flex items-start gap-3">
+                                       <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg mt-0.5">
+                                          <MessageSquare size={14} className="text-blue-600" />
+                                       </div>
+                                       <div className="flex-1">
+                                          <p className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 tracking-wider mb-2">Guide Message</p>
+                                          <div className="bg-white dark:bg-gray-800/50 rounded-lg p-3 border border-blue-100 dark:border-blue-900/30">
+                                             <p className="text-xs text-gray-700 dark:text-gray-200 leading-relaxed font-medium">
+                                                {item.feedback}
+                                             </p>
+                                          </div>
+                                       </div>
+                                    </div>
+                                 </div>
+                              )}
+                           </div>
+                        )}
+                     </div>
                   )) : (
                     <p className="text-center text-xs text-gray-400 font-bold py-10">No submissions yet.</p>
                   )}

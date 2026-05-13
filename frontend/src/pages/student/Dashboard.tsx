@@ -15,19 +15,22 @@ const StudentDashboard: React.FC = () => {
   const [stats, setStats] = useState<StudentStats | null>(null);
   const [project, setProject] = useState<StudentProject | null>(null);
   const [invitations, setInvitations] = useState<StudentInvitation[]>([]);
+  const [deadlines, setDeadlines] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsRes, projectRes, invRes] = await Promise.all([
+        const [statsRes, projectRes, invRes, deadRes] = await Promise.all([
           studentApi.getDashboardStats(),
           studentApi.getProjectDetails(),
-          studentApi.getInvitations()
+          studentApi.getInvitations(),
+          studentApi.getDeadlines()
         ]);
         setStats(statsRes.data.data);
         setProject(projectRes.data.data);
         setInvitations(invRes.data.data || []);
+        setDeadlines(deadRes.data.data || []);
       } catch (error) {
         console.error('Error fetching student dashboard data:', error);
       } finally {
@@ -152,7 +155,10 @@ const StudentDashboard: React.FC = () => {
          {/* Left: Project Stats & Progress */}
          <div className="lg:col-span-2 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <Card className="border-t-4 border-t-green-500">
+               <Card 
+                  className="border-t-4 border-t-green-500 cursor-pointer hover:scale-[1.02] transition-transform"
+                  onClick={() => navigate('/student/team')}
+               >
                   <div className="flex items-center justify-between mb-4">
                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Current Status</p>
                      <Badge variant={project?.status === 'Approved' ? 'success' : 'warning'} className="text-[10px] font-black">
@@ -170,7 +176,10 @@ const StudentDashboard: React.FC = () => {
                   </div>
                </Card>
 
-               <Card className="border-t-4 border-t-orange-500">
+               <Card 
+                  className="border-t-4 border-t-orange-500 cursor-pointer hover:scale-[1.02] transition-transform"
+                  onClick={() => navigate('/student/deadlines')}
+               >
                   <div className="flex items-center justify-between mb-4">
                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Upcoming Deadline</p>
                      <span className="text-orange-600 animate-pulse"><AlertTriangle size={16} /></span>
@@ -187,7 +196,10 @@ const StudentDashboard: React.FC = () => {
                </Card>
             </div>
 
-            <Card className="relative">
+            <Card 
+               className="relative cursor-pointer hover:shadow-lg transition-shadow"
+               onClick={() => navigate('/student/tasks')}
+            >
                <div className="flex items-center justify-between mb-8">
                   <h2 className="text-sm font-black uppercase tracking-widest text-gray-400">Project Progress (Tasks)</h2>
                   <Badge variant="secondary" className="font-black">
@@ -204,18 +216,37 @@ const StudentDashboard: React.FC = () => {
                   </div>
                   
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                     {[
-                       { label: 'Topic audit', status: 'Completed', color: 'text-green-500' },
-                       { label: 'SRS Doc', status: 'In Review', color: 'text-blue-500' },
-                       { label: 'System Design', status: 'Upcoming', color: 'text-gray-300' },
-                       { label: 'Frontend', status: 'Upcoming', color: 'text-gray-300' },
-                     ].map(step => (
-                        <div key={step.label} className="text-center">
-                           <div className={`text-[9px] font-black uppercase mb-1 ${step.color}`}>{step.status}</div>
-                           <p className="text-[10px] font-bold text-gray-500">{step.label}</p>
-                        </div>
-                     ))}
-                  </div>
+                      {deadlines.length > 0 ? deadlines.slice(0, 4).map(dl => {
+                        const colors: Record<string, string> = {
+                           'Satisfied': 'text-green-500',
+                           'Overdue': 'text-red-500',
+                           'Pending': 'text-orange-500',
+                           'Upcoming': 'text-gray-400'
+                        };
+                        return (
+                           <div 
+                              key={dl.id} 
+                              className="text-center cursor-pointer group hover:scale-105 transition-transform"
+                              onClick={(e) => {
+                                 e.stopPropagation();
+                                 navigate(dl.status === 'Satisfied' ? '/student/submissions' : '/student/deadlines');
+                              }}
+                           >
+                              <div className={`text-[9px] font-black uppercase mb-1 ${colors[dl.status] || 'text-gray-300'}`}>
+                                 {dl.status}
+                              </div>
+                              <p className="text-[10px] font-bold text-gray-500 group-hover:text-blue-500 transition-colors line-clamp-1">{dl.title}</p>
+                           </div>
+                        );
+                      }) : (
+                        ['Plan', 'Design', 'Develop', 'Launch'].map(step => (
+                           <div key={step} className="text-center opacity-30">
+                              <div className="text-[9px] font-black uppercase mb-1 text-gray-300">Upcoming</div>
+                              <p className="text-[10px] font-bold text-gray-500">{step}</p>
+                           </div>
+                        ))
+                      )}
+                   </div>
                </div>
             </Card>
 
@@ -243,7 +274,7 @@ const StudentDashboard: React.FC = () => {
 
          {/* Right: Entities & Details */}
          <div className="space-y-6">
-            <Card>
+            <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/student/team')}>
                <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-6">Group Composition</h3>
                <div className="space-y-4">
                   {project?.members.map((m, i) => (
@@ -265,7 +296,7 @@ const StudentDashboard: React.FC = () => {
                </button>
             </Card>
 
-            <Card className="bg-gray-900 text-white">
+            <Card className="bg-gray-900 text-white cursor-pointer hover:scale-[1.02] transition-transform" onClick={() => navigate('/student/team')}>
                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Guide Detail</h3>
                <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center font-black text-xs">

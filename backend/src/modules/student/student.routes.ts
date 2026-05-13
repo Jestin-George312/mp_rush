@@ -12,6 +12,7 @@ import {
     getTasks,
     linkRepository,
     submitDocument,
+    deleteSubmission,
     updateTask,
     getInvitations,
     respondToInvitation,
@@ -38,6 +39,7 @@ router.get('/batch-mates', getBatchMates);
 router.get('/submissions', getSubmissions);
 router.get('/feedback', getFeedback);
 router.post('/submissions', upload.single('file'), submitDocument);
+router.delete('/submissions/:id', deleteSubmission);
 
 router.get('/tasks', getTasks);
 router.post('/tasks', createTask);

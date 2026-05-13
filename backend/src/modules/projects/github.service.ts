@@ -25,7 +25,7 @@ export const fetchCommits = async (repoUrl: string) => {
                 Authorization: `token ${process.env.GITHUB_TOKEN}`,
                 Accept: 'application/vnd.github.v3+json',
             },
-            params: { per_page: 5 }
+            params: { per_page: 30 }
         });
 
         return response.data.map((c: any) => ({

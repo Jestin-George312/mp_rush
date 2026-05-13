@@ -3,7 +3,8 @@ import Card from '../../components/common/UI/Card';
 import Badge from '../../components/common/UI/Badge';
 import { 
   MessageSquare, Download, 
-  History, AlertCircle, Inbox
+  History, AlertCircle, Inbox,
+  FileText
 } from 'lucide-react';
 import { studentApi } from '../../services/studentApi';
 import toast from 'react-hot-toast';
@@ -93,9 +94,16 @@ const FeedbackReview: React.FC = () => {
                         </div>
                      </div>
 
-                     <button className="w-full mt-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-xl text-[10px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center gap-2">
-                         <Download size={14} /> VIEW EVALUATED RAW FILE
-                     </button>
+                     {review.file_path && (
+                        <a 
+                           href={review.file_path.startsWith('http') ? review.file_path : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${review.file_path.startsWith('/') ? '' : '/'}${review.file_path}`} 
+                           target="_blank" 
+                           rel="noopener noreferrer" 
+                           className="w-full mt-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-xl text-[10px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center gap-2"
+                        >
+                           <Download size={14} /> VIEW EVALUATED RAW FILE
+                        </a>
+                     )}
                   </div>
 
                   {/* Comments Stream */}
@@ -104,26 +112,58 @@ const FeedbackReview: React.FC = () => {
                         <MessageSquare size={14} /> Critical Review Insights
                      </h4>
                      <div className="space-y-4">
+                        {review.marked_file_path && (
+                           <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 border border-amber-200 dark:border-amber-900/40 rounded-2xl">
+                              <div className="flex items-start gap-3">
+                                 <div className="p-3 bg-amber-100 dark:bg-amber-900/40 rounded-lg mt-0.5 flex-shrink-0">
+                                    <FileText size={20} className="text-amber-600" />
+                                 </div>
+                                 <div className="flex-1 min-w-0">
+                                    <p className="text-[10px] font-black uppercase text-amber-700 dark:text-amber-400 tracking-wider mb-2 flex items-center gap-1">
+                                       ✓ Marked Document with Annotations
+                                    </p>
+                                    <p className="text-xs text-amber-600 dark:text-amber-300 font-semibold mb-4 leading-relaxed">
+                                       Your guide has reviewed and marked your document with highlights and annotations showing specific areas for improvement. Download below to see all marked sections.
+                                    </p>
+                                    <a 
+                                       href={review.marked_file_path.startsWith('http') ? review.marked_file_path : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${review.marked_file_path.startsWith('/') ? '' : '/'}${review.marked_file_path}`} 
+                                       target="_blank" 
+                                       rel="noopener noreferrer"
+                                       className="inline-flex items-center gap-2 px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-amber-600/30"
+                                       download
+                                    >
+                                       <Download size={16} /> Download Marked Document
+                                    </a>
+                                 </div>
+                              </div>
+                           </div>
+                        )}
+                        
                         {review.comments.length === 0 ? (
                            <p className="text-sm text-gray-400 italic py-4">No specific comments provided.</p>
                         ) : (
-                          review.comments.map((comment: any, idx: number) => (
-                            <div key={idx} className="relative pl-6">
-                               <div className="absolute left-0 top-1 w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(37,99,235,0.6)]"></div>
-                               <p className="text-sm font-medium leading-relaxed bg-gray-50/50 dark:bg-gray-800/50 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 whitespace-pre-wrap text-gray-700 dark:text-gray-300">
-                                  {comment.text}
-                                  <span className="block mt-2 text-[9px] font-black text-gray-400 uppercase tracking-widest">{comment.time}</span>
-                               </p>
-                            </div>
-                          ))
+                           <div>
+                              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-3">Feedback Notes</p>
+                              {review.comments.map((comment: any, idx: number) => {
+                                return (
+                                  <div key={idx} className="relative pl-6 mb-3 last:mb-0">
+                                     <div className="absolute left-0 top-1 w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(37,99,235,0.6)]"></div>
+                                     <p className="text-sm font-medium leading-relaxed bg-gray-50/50 dark:bg-gray-800/50 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 whitespace-pre-wrap text-gray-700 dark:text-gray-300">
+                                        {comment.text}
+                                        <span className="block mt-2 text-[9px] font-black text-gray-400 uppercase tracking-widest">{comment.time}</span>
+                                     </p>
+                                  </div>
+                                );
+                              })}
+                           </div>
                         )}
                         
                         {review.status === 'Action Required' && (
                           <div className="p-4 bg-orange-50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/20 rounded-2xl flex items-start gap-3">
-                             <AlertCircle size={20} className="text-orange-500" />
+                             <AlertCircle size={20} className="text-orange-500 flex-shrink-0 mt-0.5" />
                              <div>
-                                <p className="text-xs font-black text-orange-600 uppercase mb-1">Resubmission Active</p>
-                                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter">Please address the above items and upload a revised version to the portal.</p>
+                                <p className="text-xs font-black text-orange-600 uppercase mb-1">Resubmission Required</p>
+                                <p className="text-[10px] text-gray-600 dark:text-gray-300 font-bold leading-relaxed">Please address all marked sections in the document above and upload a revised version to the Submissions portal.</p>
                              </div>
                           </div>
                         )}

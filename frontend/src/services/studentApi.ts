@@ -23,6 +23,7 @@ export interface StudentProject {
   id: string;
   title: string;
   description: string;
+  domain?: string;
   status: 'Pending' | 'Approved' | 'Revision Requested';
   topicFeedback?: string;
   createdAt: string;
@@ -79,17 +80,19 @@ export const studentApi = {
 
   // Submissions
   getSubmissionStatus: () => api.get<any[]>('/student/submissions'),
-  submitDocument: (payload: { project_id: number; type: string; parent_doc_id?: number }, file: File) => {
+  submitDocument: (payload: { project_id: number; type: string; documentName: string; deadlineId?: string }, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('project_id', payload.project_id.toString());
     formData.append('type', payload.type);
-    if (payload.parent_doc_id) formData.append('parent_doc_id', payload.parent_doc_id.toString());
+    formData.append('documentName', payload.documentName);
+    if (payload.deadlineId) formData.append('deadlineId', payload.deadlineId);
     
-    return api.post('/submissions', formData, {
+    return api.post('/student/submissions', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
+  deleteSubmission: (docId: number) => api.delete(`/student/submissions/${docId}`),
   
   // Kanban
   getTasks: () => api.get<any[]>('/student/tasks'),
@@ -101,7 +104,7 @@ export const studentApi = {
   getFeedback: () => api.get<any[]>('/student/feedback'),
 
   // GitHub
-  linkRepository: (repoUrl: string) => api.post('/github/link', { repoUrl }),
-  getGitCommits: () => api.get<any[]>('/github/commits'),
+  linkRepository: (repoUrl: string) => api.post('/student/project/github', { repoUrl }),
+  getGitCommits: () => api.get<any[]>('/student/project/git/commits'),
   getBatchSettings: () => api.get<any>('/student/batch-settings'),
 };

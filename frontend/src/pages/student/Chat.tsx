@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, File as FileIcon, X } from 'lucide-react';
+import { Send, Paperclip, File as FileIcon, X, Star } from 'lucide-react';
 import Card from '../../components/common/UI/Card';
-import { studentApi } from '../../services/studentApi';
+import { studentApi, type StudentProject } from '../../services/studentApi';
 import { fetchMessages, sendMessage } from '../../services/commsApi';
 import { useAuth } from '../../hooks/useAuth';
 import { useSocket } from '../../hooks/useSocket';
@@ -23,6 +23,7 @@ const Chat: React.FC = () => {
     const [inputValue, setInputValue] = useState('');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [groupId, setGroupId] = useState<number | null>(null);
+    const [project, setProject] = useState<StudentProject | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -31,9 +32,10 @@ const Chat: React.FC = () => {
     useEffect(() => {
         studentApi.getProjectDetails()
             .then(res => {
-                const project = res.data.data;
-                if (project && project.groupId) {
-                    setGroupId(project.groupId);
+                const proj = res.data.data;
+                setProject(proj);
+                if (proj && proj.groupId) {
+                    setGroupId(proj.groupId);
                 }
             }).catch(console.error);
     }, []);
@@ -147,22 +149,78 @@ const Chat: React.FC = () => {
 
     return (
         <div className="h-[calc(100vh-120px)] flex gap-6">
-            <div className="w-80 flex-shrink-0">
-                <Card>
-                    <div className="text-center mb-6">
+            <div className="w-80 flex-shrink-0 flex flex-col gap-6">
+                <Card className="flex-shrink-0">
+                    <div className="text-center">
                         <img
                             src={`https://ui-avatars.com/api/?name=${user?.name}&background=8b5cf6&color=fff`}
                             alt="Panel"
-                            className="w-24 h-24 rounded-full mx-auto mb-4 ring-4 ring-violet-100 dark:ring-violet-900"
+                            className="w-20 h-20 rounded-full mx-auto mb-4 ring-4 ring-violet-100 dark:ring-violet-900"
                         />
-                        <h2 className="text-xl font-bold">Group Channel</h2>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Real-time Intercom</p>
+                        <h2 className="text-lg font-bold">Group Channel</h2>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Real-time Intercom</p>
                         <div className="flex items-center justify-center gap-2 mt-2">
-                            <span className={`w-3 h-3 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-                            <span className="text-sm font-bold text-gray-600 dark:text-gray-400 capitalize">
-                                {connected ? 'Live Connection' : 'Offline (Reconnect...)'}
+                            <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                            <span className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-widest">
+                                {connected ? 'Online' : 'Offline'}
                             </span>
                         </div>
+                        {project && (
+                            <div className="flex items-center justify-center gap-2 mt-4 flex-wrap">
+                                <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${
+                                    project.mode === 'Group' 
+                                        ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' 
+                                        : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                }`}>
+                                    {project.mode}
+                                </span>
+                                {project.domain && (
+                                    <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                                        {project.domain}
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </Card>
+
+                <Card className="flex-1 overflow-hidden flex flex-col">
+                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-4 px-2">Team Participants</h3>
+                    <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                        {project?.members.map(member => (
+                            <div key={member.uid} className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                <div className="relative">
+                                    <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center font-black text-xs">
+                                        {member.full_name.charAt(0)}
+                                    </div>
+                                    {member.is_leader && (
+                                        <div className="absolute -top-1 -right-1 bg-amber-400 text-white p-0.5 rounded-full shadow-sm">
+                                            <Star size={10} className="fill-white" />
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-black truncate">{member.full_name} {member.uid === String(user?.id) ? '(You)' : ''}</p>
+                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">
+                                        {member.is_leader ? 'Group Leader' : 'Collaborator'}
+                                    </p>
+                                </div>
+                            </div>
+                        ))}
+                        {project?.guideName && (
+                            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Project Guide</p>
+                                <div className="flex items-center gap-3 p-2 rounded-xl bg-gray-900 text-white">
+                                    <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center font-black text-xs">
+                                        {project.guideName.charAt(0)}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-black truncate">{project.guideName}</p>
+                                        <p className="text-[9px] font-bold text-blue-400 uppercase tracking-tighter">Assigned Mentor</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </Card>
             </div>

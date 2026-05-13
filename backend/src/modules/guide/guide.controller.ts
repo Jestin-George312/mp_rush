@@ -126,7 +126,8 @@ export const markProjectCompleted = async (req: Request, res: Response) => {
 
 export const getPendingDocuments = async (req: Request, res: Response) => {
     try {
-        const data = await guideService.getPendingDocuments(req.user!.id);
+        const statusFilter = (req.query.status as string) || 'Pending';
+        const data = await guideService.getPendingDocuments(req.user!.id, statusFilter);
         sendSuccess(res, data);
     } catch (error: any) {
         logger.error('guide.getPendingDocuments error:', error.message);
@@ -140,7 +141,15 @@ export const reviewDocument = async (req: Request, res: Response) => {
         const { status, feedback } = req.body;
         if (isNaN(docId)) return sendError(res, 'Invalid document id', 400);
 
-        const data = await guideService.reviewDocument(req.user!.id, docId, status, feedback);
+        let fileData = undefined;
+        if (req.file) {
+            fileData = {
+                filename: req.file.filename,
+                originalname: req.file.originalname
+            };
+        }
+
+        const data = await guideService.reviewDocument(req.user!.id, docId, status, feedback, fileData);
         sendSuccess(res, data, 'Document reviewed');
     } catch (error: any) {
         logger.error('guide.reviewDocument error:', error.message);

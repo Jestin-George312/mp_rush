@@ -4,10 +4,12 @@ import {
   Activity, TrendingUp, CheckCircle2, 
   AlertCircle, Github, Calendar, ArrowUpRight, Loader2
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { studentApi } from '../../services/studentApi';
 import type { StudentStats } from '../../services/studentApi';
 
 const ProgressInsights: React.FC = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = React.useState<StudentStats | null>(null);
   const [submissions, setSubmissions] = React.useState<any[]>([]);
   const [commits, setCommits] = React.useState<any[]>([]);
@@ -75,29 +77,38 @@ const ProgressInsights: React.FC = () => {
                </h3>
                
                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                  <div className="relative flex flex-col items-center justify-center p-8 bg-gray-50 dark:bg-gray-800/50 rounded-3xl group overflow-hidden">
-                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform">
+                  <div 
+                    onClick={() => navigate('/student/repository')}
+                    className="relative flex flex-col items-center justify-center p-8 bg-gray-50 dark:bg-gray-800/50 rounded-3xl group overflow-hidden cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-all border border-transparent hover:border-blue-500/20"
+                  >
+                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform text-blue-500">
                         <Github size={120} />
                      </div>
-                     <p className="text-4xl font-black text-gray-800 dark:text-white">{commits.length}</p>
+                     <p className="text-4xl font-black text-gray-800 dark:text-white group-hover:scale-110 transition-transform">{commits.length}</p>
                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">Commits Logged</p>
                      <div className="mt-4 px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-600 rounded-full text-[9px] font-black">Sync: Active</div>
                   </div>
 
-                  <div className="relative flex flex-col items-center justify-center p-8 bg-gray-50 dark:bg-gray-800/50 rounded-3xl group overflow-hidden">
-                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform">
+                  <div 
+                    onClick={() => navigate('/student/tasks')}
+                    className="relative flex flex-col items-center justify-center p-8 bg-gray-50 dark:bg-gray-800/50 rounded-3xl group overflow-hidden cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-all border border-transparent hover:border-blue-500/20"
+                  >
+                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform text-blue-500">
                         <CheckCircle2 size={120} />
                      </div>
-                     <p className="text-4xl font-black text-gray-800 dark:text-white">{stats?.kanbanTasks?.done || 0}</p>
+                     <p className="text-4xl font-black text-gray-800 dark:text-white group-hover:scale-110 transition-transform">{stats?.kanbanTasks?.done || 0}</p>
                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">Tasks Satisfied</p>
                      <div className="mt-4 px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-full text-[9px] font-black">Velocity: Healthy</div>
                   </div>
 
-                  <div className="relative flex flex-col items-center justify-center p-8 bg-gray-50 dark:bg-gray-800/50 rounded-3xl group overflow-hidden">
-                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform">
+                  <div 
+                    onClick={() => navigate('/student/deadlines')}
+                    className="relative flex flex-col items-center justify-center p-8 bg-gray-50 dark:bg-gray-800/50 rounded-3xl group overflow-hidden cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-all border border-transparent hover:border-orange-500/20"
+                  >
+                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform text-orange-500">
                         <Calendar size={120} />
                      </div>
-                     <p className="text-4xl font-black text-gray-800 dark:text-white">{String(stats?.pendingDeadlinesCount || 0).padStart(2, '0')}</p>
+                     <p className="text-4xl font-black text-gray-800 dark:text-white group-hover:scale-110 transition-transform">{String(stats?.pendingDeadlinesCount || 0).padStart(2, '0')}</p>
                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">Open Deadlines</p>
                      <div className="mt-4 px-3 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-600 rounded-full text-[9px] font-black">Tracked</div>
                   </div>
@@ -105,7 +116,10 @@ const ProgressInsights: React.FC = () => {
             </Card>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-               <Card>
+               <Card 
+                  className="cursor-pointer hover:shadow-xl transition-shadow border border-transparent hover:border-blue-500/10"
+                  onClick={() => navigate('/student/submissions')}
+               >
                   <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-6">Recent Deliverable Status</h3>
                   <div className="space-y-4">
                      {submissions.length > 0 ? submissions.slice(0, 2).map((d, i) => (
@@ -124,7 +138,10 @@ const ProgressInsights: React.FC = () => {
                   </div>
                </Card>
 
-               <Card className="bg-blue-600 text-white shadow-xl shadow-blue-500/20">
+               <Card 
+                  className="bg-blue-600 text-white shadow-xl shadow-blue-500/20 cursor-pointer hover:scale-[1.02] transition-transform"
+                  onClick={() => navigate('/student/deadlines')}
+               >
                    <div className="space-y-4">
                       {nextTarget ? (
                         <>

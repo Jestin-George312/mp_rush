@@ -1,5 +1,8 @@
 import pool from '../../config/db';
 import * as notificationService from '../notifications/notification.service';
+import { UPLOAD_URL_PREFIX, UPLOAD_DIR } from '../../config/storage';
+import { uploadToDrive } from '../../services/googleDrive.service';
+import path from 'path';
 
 const getHealthLabel = (daysOverdue: number, hasRepo: boolean) => {
     if (daysOverdue > 3) return 'At Risk';
@@ -311,13 +314,17 @@ export const getGroupDetails = async (guideId: number, groupId: number) => {
     };
 };
 
-export const getPendingDocuments = async (guideId: number) => {
+export const getPendingDocuments = async (guideId: number, statusFilter: string = 'Pending') => {
+    const isPendingOnly = statusFilter === 'Pending';
     const result = await pool.query(
         `SELECT
             d.id,
             d.name,
             d.status,
+            d.feedback,
             d.created_at,
+            d.reviewed_at,
+            d.file_path,
             p.title AS project_title,
             g.group_name,
             b.name AS batch_name,
@@ -327,7 +334,7 @@ export const getPendingDocuments = async (guideId: number) => {
          JOIN groups g ON g.id = p.group_id
          LEFT JOIN batches b ON b.id = g.batch_id
          LEFT JOIN deadlines dl ON dl.id = d.deadline_id
-         WHERE g.guide_id = $1 AND d.status = 'Pending'
+         WHERE g.guide_id = $1 ${isPendingOnly ? "AND d.status = 'Pending'" : ''}
          ORDER BY d.created_at DESC`,
         [guideId]
     );
@@ -338,21 +345,52 @@ export const reviewDocument = async (
     guideId: number,
     docId: number,
     status: 'Approved' | 'Rejected' | 'Needs Revision',
-    feedback?: string
+    feedback?: string,
+    fileData?: { filename: string; originalname: string }
 ) => {
+    let finalFeedback = feedback || '';
+    let markedFilePath: string | null = null;
+
+    if (fileData) {
+        const localFilePath = path.join(UPLOAD_DIR, fileData.filename);
+        let driveLink = '';
+        
+        try {
+            const ext = path.extname(fileData.originalname).toLowerCase();
+            let mimeType = 'application/octet-stream';
+            if (ext === '.pdf') mimeType = 'application/pdf';
+            else if (ext === '.doc') mimeType = 'application/msword';
+            else if (ext === '.docx') mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+            else if (ext === '.png') mimeType = 'image/png';
+            else if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+
+            const driveRes = await uploadToDrive(localFilePath, `Marked_${fileData.originalname}`, mimeType);
+            driveLink = driveRes.link as string;
+        } catch (error: any) {
+            console.error('Drive upload failed for marked doc:', error.message);
+            // Fallback to local URL if drive fails
+            driveLink = `${UPLOAD_URL_PREFIX}/${fileData.filename}`;
+        }
+
+        if (driveLink) {
+            markedFilePath = driveLink;
+        }
+    }
+
     const result = await pool.query(
         `UPDATE documents d
          SET status = $1,
              feedback = $2,
-             reviewed_by = $3,
+             marked_file_path = $3,
+             reviewed_by = $4,
              reviewed_at = NOW()
          FROM projects p
          JOIN groups g ON g.id = p.group_id
-         WHERE d.id = $4
+         WHERE d.id = $5
            AND p.id = d.project_id
-           AND g.guide_id = $3
+           AND g.guide_id = $4
          RETURNING d.*`,
-        [status, feedback || null, guideId, docId]
+        [status, finalFeedback || null, markedFilePath, guideId, docId]
     );
     if (result.rows.length === 0) throw new Error('Document not found');
 

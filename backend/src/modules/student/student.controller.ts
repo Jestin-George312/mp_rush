@@ -68,15 +68,29 @@ export const submitDocument = async (req: Request, res: Response) => {
     try {
         if (!req.file) return sendError(res, 'No file uploaded', 400);
 
+        const { deadlineId, documentName } = req.body;
         const data = await studentService.createStudentSubmission(req.user!.id, {
-            deadlineId: req.body.deadlineId ? parseInt(req.body.deadlineId) : null,
+            deadlineId: deadlineId ? parseInt(deadlineId) : null,
             filename: req.file.filename,
             originalname: req.file.originalname,
+            documentName: documentName || req.file.originalname
         });
         sendSuccess(res, data, 'Submission uploaded', 201);
     } catch (error: any) {
         logger.error('student.submitDocument error:', error.message);
         sendError(res, error.message || 'Could not upload submission', 500);
+    }
+};
+
+export const deleteSubmission = async (req: Request, res: Response) => {
+    try {
+        const docId = parseInt(req.params.id as string);
+        if (isNaN(docId)) return sendError(res, 'Invalid document id', 400);
+        const data = await studentService.deleteStudentSubmission(req.user!.id, docId);
+        sendSuccess(res, data, 'Submission deleted');
+    } catch (error: any) {
+        logger.error('student.deleteSubmission error:', error.message);
+        sendError(res, error.message || 'Could not delete submission', 500);
     }
 };
 
